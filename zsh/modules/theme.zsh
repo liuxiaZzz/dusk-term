@@ -132,9 +132,14 @@ fi
 #   jt               pick from the tmux sessions on all your servers, or start a new one
 #   jt work          session "work" on the default server
 #   jt host work     session "work" on that server
+#   jt host          session $DUSK_TMUX_SESSION on any host from ~/.ssh/config
 # The command name is $DUSK_TMUX_CMD (set with `dusk tmux`). Windows open in a NEW iTerm2
 # window that already uses the right profile, so the tmux windows inherit it.
 _dusk_tmux_hosts() { reply=(${=DUSK_TMUX_HOSTS:-$DUSK_TMUX_HOST}) }
+# every concrete Host name in ~/.ssh/config (wildcards skipped)
+_dusk_ssh_config_hosts() {
+  reply=(${(f)"$(awk 'tolower($1)=="host" {for (i=2;i<=NF;i++) if ($i !~ /[*?!]/) print $i}' ~/.ssh/config 2>/dev/null)"})
+}
 
 _dusk_tmux_open() {   # _dusk_tmux_open <host> <session>
   osascript - "${DUSK_TMUX_PROFILE:-$DUSK_REMOTE_PROFILE}" "$1" "$2" <<'APPLESCRIPT'
@@ -195,6 +200,10 @@ _dusk_tmux_pick() {
     rows+=("$(printf '\e[38;2;122;162;255m%-16s\e[0m  \e[38;2;228;139;180m＋ 新建会话\e[0m' $h)"); keys+=("$h|+")
   done
   command rm -rf "$tmp"
+  _dusk_ssh_config_hosts; local -a others=(${reply:|hosts})
+  if (( $#others )); then
+    rows+=("$(printf '\e[38;2;228;139;180m＋ 其他服务器…\e[0m  \e[38;2;127;132;163m~/.ssh/config 里还有 %s 台\e[0m' $#others)"); keys+=("|other")
+  fi
 
   local idx
   if (( $+commands[fzf] )) && [[ -t 0 && -t 1 ]]; then
@@ -211,6 +220,10 @@ _dusk_tmux_pick() {
   fi
   [[ $idx == <-> ]] && (( idx >= 1 && idx <= $#keys )) || return 0
   h=${keys[idx]%%|*}; name=${keys[idx]#*|}
+  if [[ $name == other ]]; then
+    _dusk_pick_other_host "${others[@]}" || return 0
+    h=$REPLY; name=+
+  fi
   if [[ -z $name || $name == + ]]; then
     read -r "name?$(print -n '  \e[38;2;228;139;180m❯\e[0m ')在 $h 上新建的会话名 [${DUSK_TMUX_SESSION}]："
     name=${name:-$DUSK_TMUX_SESSION}
@@ -218,11 +231,37 @@ _dusk_tmux_pick() {
   _dusk_tmux_open "$h" "$name"
 }
 
+# choose one of the given hosts (fzf or numbered); offers to add it to the tmux list → REPLY
+_dusk_pick_other_host() {
+  local -a list=("$@"); local pick idx n=0 h
+  if (( $+commands[fzf] )) && [[ -t 0 && -t 1 ]]; then
+    pick=$(for h in $list; do (( n++ )); printf '%3d  \e[38;2;122;162;255m%s\e[0m\n' $n $h; done | \
+      fzf --ansi --height=50% --layout=reverse --border=rounded --prompt='服务器 › ' --info=hidden \
+          --header='~/.ssh/config 里的服务器；回车选择，Esc 返回' \
+          --color='border:#e48bb4,prompt:#7aa2ff,pointer:#e48bb4,hl:#e48bb4,hl+:#e48bb4,header:8') || return 1
+    idx=${${=pick}[1]}
+  else
+    print; for h in $list; do (( n++ )); printf '  \e[38;2;122;162;255m%2d\e[0m  %s\n' $n $h; done
+    read -r "idx?$(print -n '  \e[38;2;228;139;180m❯\e[0m ')选服务器编号（回车取消）："
+  fi
+  [[ $idx == <-> ]] && (( idx >= 1 && idx <= $#list )) || return 1
+  h=$list[idx]
+  local yn
+  read -r "yn?$(print -n '  \e[38;2;228;139;180m❯\e[0m ')把 $h 加入 $DUSK_TMUX_CMD 的常用列表，以后每次都显示它的会话？[Y/n] "
+  if [[ $yn != [nN]* ]] && (( $+functions[_dk_config_set] )); then
+    _dusk_tmux_hosts; local -a merged=(${(u)reply} $h)
+    _dk_config_set DUSK_TMUX_HOSTS "${merged[*]}"
+    [[ -z $DUSK_TMUX_HOST ]] && _dk_config_set DUSK_TMUX_HOST "$h"
+  fi
+  REPLY=$h
+}
+
 _dusk_tmux() {
   _dusk_tmux_hosts; local -a hosts=($reply)
   (( $#hosts )) || { print "还没设置服务器：运行 dusk tmux"; return 1 }
   if (( $# == 0 )); then _dusk_tmux_pick; return; fi
-  if (( $# >= 2 )) || (( ${hosts[(Ie)$1]} )); then _dusk_tmux_open "$1" "${2:-$DUSK_TMUX_SESSION}"
+  _dusk_ssh_config_hosts; local -a known=($reply)
+  if (( $# >= 2 )) || (( ${hosts[(Ie)$1]} || ${known[(Ie)$1]} )); then _dusk_tmux_open "$1" "${2:-$DUSK_TMUX_SESSION}"
   else _dusk_tmux_open "$hosts[1]" "$1"; fi
 }
 
