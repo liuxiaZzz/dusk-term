@@ -30,6 +30,7 @@ export PATH="$BIN:$PATH"
 BEGIN="# >>> dusk >>>"
 END="# <<< dusk <<<"
 
+ORIG_ARGS=("$@")
 MODULES=""
 ROLE=""
 TMUX_HOST=""
@@ -73,11 +74,14 @@ done
 ZH=0; [[ "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" == zh* ]] && ZH=1   # before any locale change
 t() { if (( ZH )); then printf '%s' "$1"; else printf '%s' "$2"; fi; }   # t "中文" "English"
 
-# character counts need a UTF-8 locale; ASCII ranges need C collation
-if [[ "$(locale charmap 2>/dev/null)" != UTF-8 ]]; then
+# character counts need a UTF-8 locale (bash only picks it up at start, so restart once
+# under one); ASCII ranges need C collation
+if [[ "$(locale charmap 2>/dev/null)" != UTF-8 && -z ${DUSK_REEXEC:-} ]]; then
   u="$(locale -a 2>/dev/null | grep -iE '^(c|en_us)\.utf-?8$' | head -1 || true)"
-  [[ -n $u ]] && export LC_ALL=$u
+  [[ -n $u ]] && DUSK_REEXEC=1 LC_CTYPE=$u exec env -u LC_ALL bash "$0" "${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}"
 fi
+# LC_ALL would override LC_COLLATE: move it to LC_CTYPE (character set) instead
+if [[ -n ${LC_ALL:-} ]]; then export LC_CTYPE=$LC_ALL; unset LC_ALL; fi
 export LC_COLLATE=C
 
 TTY=0; [[ -t 1 ]] && TTY=1
@@ -106,8 +110,19 @@ rule() { local n=$1 c=${2:-─} out=""; while (( n-- > 0 )); do out+=$c; done; p
 
 WIDTH=58
 # a pink-framed card; lines are given as "plain text" + "colored text" so widths stay right
-card_top()    { local tl=" $1 " w; w=$(dw "$tl"); printf '  %s╭─%s%s%s%s%s%s╮%s\n' "$PINK" "$N" "$BG_PINK$WHITE$BOLD" "$tl" "$N" "$PINK" "$(rule $(( WIDTH - 4 - w )))" "$N"; }
+card_top()    { local tl=" $1 " w; w=$(dw "$tl"); printf '  %s╭─%s%s%s%s%s%s╮%s\n' "$PINK" "$N" "$BG_PINK$WHITE$BOLD" "$tl" "$N" "$PINK" "$(rule $(( WIDTH - 3 - w )))" "$N"; }
 card_line()   { local plain=$1 colored=${2:-$1} w; w=$(dw "$plain"); printf '  %s│%s  %s%*s%s│%s\n' "$PINK" "$N" "$colored" $(( WIDTH - 4 - w )) '' "$PINK" "$N"; }
+# wrap <width> <text>: print the text in lines of at most <width> display columns
+wrap() {
+  local width=$1 line="" w
+  for w in $2; do
+    if [[ -z $line ]]; then line=$w
+    elif (( $(dw "$line $w") <= width )); then line="$line $w"
+    else printf '%s\n' "$line"; line=$w; fi
+  done
+  [[ -n $line ]] && printf '%s\n' "$line"
+  return 0
+}
 card_bottom() { printf '  %s╰%s╯%s\n' "$PINK" "$(rule $(( WIDTH - 2 )))" "$N"; }
 
 STEP=0
@@ -370,7 +385,11 @@ cfg_line() { [[ -n $2 ]] && printf ": \${%s:='%s'}\n" "$1" "${2//\'/}"; return 0
 } > "$CONF_DIR/config.zsh"
 ok "$(t 'zsh 模块' 'zsh modules')" "$(short "$CONF_DIR")"
 if [[ -n $TAKEN ]] && { has_mod tools || has_mod remote; }; then
-  skip "$(t '保留你已有的命令' 'keeping your commands')" "$TAKEN"
+  first=1
+  while IFS= read -r l; do
+    if (( first )); then skip "$(t '保留你已有的命令' 'keeping your commands')" "$l"; first=0
+    else printf '     %s  %s %s%s\n' "$MUTE" "$(pad "" 24)" "$l" "$N"; fi
+  done < <(wrap 30 "$TAKEN")
   NOTES+=("$(t '这些命令保留了你原来的版本：' 'These kept your existing version:')|$TAKEN")
 fi
 
@@ -408,7 +427,7 @@ if (( ${#NOTES[@]} )); then
   card_line "$(t '还差一步' 'One more thing')" "$SKY$BOLD$(t '还差一步' 'One more thing')$N"
   for n in "${NOTES[@]}"; do
     card_line "${n%%|*}"
-    card_line "  ${n#*|}" "  $PINK${n#*|}$N"
+    while IFS= read -r l; do card_line "  $l" "  $PINK$l$N"; done < <(wrap $(( WIDTH - 8 )) "${n#*|}")
   done
 fi
 card_line ""
