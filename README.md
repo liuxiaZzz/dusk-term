@@ -22,7 +22,7 @@ git clone https://github.com/liuxiaZzz/dusk-term.git ~/.dusk
 
 也可以直接用参数跳过提问：`--style classic|glass`、`--mode split|dark|light`，或 `-y` 全用默认。
 
-装完新开一个终端（或 `exec zsh`），输入 `hud` 打开控制中心，`dusk help` 查看所有快捷命令。
+装完新开一个终端（或 `exec zsh`），输入 `dusk` 打开命令面板，所有功能都在里面。
 
 macOS 上再做一步：iTerm2 → **Settings → Profiles** → 选安装结束时提示的配置文件 → **Other Actions… → Set as Default**。
 
@@ -80,7 +80,7 @@ GCR 更新只会覆盖它自己的文件，dusk 放在 `~/.config/dusk`，互不
 
 ## 控制中心
 
-新标签页会显示一个仿 iOS / macOS 的控制中心，也可以随时输入 `hud`（或 `dusk`）打开：
+新标签页会显示一个仿 iOS / macOS 的控制中心，也可以随时输入 `hud` 打开：
 
 - 锁屏风格的大时钟（蓝→粉渐变）、日期、问候
 - CPU / 内存 / 磁盘 / 电池磁贴，带 iOS 风格滑条（服务器上自动换成 GPU 或运行时长）
@@ -88,6 +88,10 @@ GCR 更新只会覆盖它自己的文件，dusk 放在 `~/.config/dusk`，互不
 - 一排常用快捷键胶囊
 
 窄窗口自动变成两列；`hud -c` 是一行精简版。`DUSK_WELCOME=2` 让新标签页只显示精简版，`0` 关闭。
+
+## 只需要记一个命令：`dusk`
+
+直接输入 `dusk`，会弹出命令面板，列出所有功能。装了 fzf 时可以输入几个字筛选（比如"端口""主题""tmux"），回车执行；需要参数的会当场问你。执行后还会提示"下次可以直接输入：……"，用多了自然记住快捷方式。
 
 ## 快捷命令
 
@@ -136,7 +140,8 @@ GCR 更新只会覆盖它自己的文件，dusk 放在 `~/.config/dusk`，互不
 
 | 命令 | 作用 |
 |---|---|
-| `dusk` / `hud` | 控制中心 |
+| `dusk` | 命令面板（所有功能） |
+| `hud` | 控制中心 |
 | `dusk help` | 速查表 |
 | `dusk update` | 拉取最新版并重新安装 |
 | `dusk doctor` | 检查依赖是否齐全 |
@@ -153,7 +158,12 @@ dusk tmux me@server jt     # 或者直接说
 dusk tmux off              # 关掉
 ```
 
-例如"本机浅色玻璃、远程深色玻璃"就是 `dusk theme glass split`。唯一要手动的是 iTerm2 的默认配置文件（新开标签页用哪个）：`dusk theme` 会告诉你该把哪个设为默认。
+例如"本机浅色玻璃、远程深色玻璃"就是 `dusk theme glass split`。
+
+**一键进 tmux 时，tmux 窗口和网关窗口颜色不一样？** iTerm2 默认让 tmux 窗口用一个单独叫 "tmux" 的配置文件。到 iTerm2 → **Settings → General → tmux**：
+
+- 取消勾选 **Use "tmux" profile rather than profile of the connecting session**，tmux 窗口就会和 `dusk tmux` 选的配色一致，换主题也会跟着变
+- 勾选 **Automatically bury the tmux client session after connecting**，连接用的网关窗口会自动藏起来唯一要手动的是 iTerm2 的默认配置文件（新开标签页用哪个）：`dusk theme` 会告诉你该把哪个设为默认。
 
 重新运行 `install.sh` 也会记住你之前的所有选择，只改你这次明确指定的。
 

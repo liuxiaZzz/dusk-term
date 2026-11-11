@@ -49,7 +49,7 @@ _dusk_help() {
     _dk_dim "  想改用 dusk 的版本：在 ~/.zshrc 的 dusk 区块前加 DUSK_OVERRIDE=1"
   fi
   print
-  _dk_dim "  dusk / hud  控制中心    dusk help  本帮助    dusk update  更新    dusk doctor  检查依赖"
+  _dk_dim "  dusk  命令面板（记这一个就够）    hud  控制中心    dusk theme / tmux / update / doctor"
 }
 
 # ─── config.zsh: one ": ${KEY:='value'}" line per setting ────────────────────
@@ -163,13 +163,87 @@ _dusk_doctor() {
   (( $#DUSK_SKIPPED )) && print -P "  %F{8}·%f 让给其他工具的命令：${DUSK_SKIPPED[*]}"
 }
 
+# ─── dusk: one entry point — a command palette ───────────────────────────────
+# Each entry: "icon|name|what it does|command|question to ask for an argument (optional)"
+_dusk_entries() {
+  reply=()
+  reply+=("󰕮|控制中心|时钟、CPU、内存、磁盘、电池一览|hud|")
+  if [[ -n $DUSK_TMUX_HOST ]] && (( $+functions[$DUSK_TMUX_CMD] )); then
+    reply+=("|进服务器 tmux|连到 $DUSK_TMUX_HOST 的 tmux|$DUSK_TMUX_CMD|会话名（回车 = $DUSK_TMUX_SESSION）")
+  fi
+  (( $+functions[j] || $+aliases[j] )) && reply+=("|跳转目录|跳到常去的目录|j|目录关键词")
+  (( $+functions[_dk_listen] )) && reply+=("󰛳|端口转发|SSH 转发远程端口到本机|listen|")
+  (( $+functions[_dk_upload] )) && [[ ${DUSK_ROLE:-local} == server ]] && {
+    reply+=("󰕒|上传文件|从本机选文件传到这里|upload|")
+    reply+=("󰇚|下载文件|把这里的文件传回本机|download|文件名（回车 = 列表里选）")
+  }
+  (( $+functions[_dk_sz] ))   && reply+=("󰋊|磁盘和目录大小|看磁盘，或某个目录有多大|sz|目录（回车 = 看磁盘）")
+  (( $+functions[_dk_pid] ))  && reply+=("|查进程|按名字找进程（无 = GPU 进程）|pid|进程名关键词")
+  (( $+functions[_dk_port] )) && reply+=("󰈀|谁占用端口|查看某个端口被谁监听|port|端口号")
+  reply+=("󰏘|换主题|风格、本机和远程的配色|dusk theme|")
+  reply+=("|设置一键进 tmux|服务器、会话、命令名、配色|dusk tmux|")
+  reply+=("|全部快捷命令|速查表|dusk help|")
+  reply+=("󰓦|检查依赖|看看缺什么|dusk doctor|")
+  reply+=("󰚰|更新 Dusk|拉取最新版并重新安装|dusk update|")
+}
+
+_dusk_menu() {
+  _dusk_entries; local -a entries=("${reply[@]}")
+  local e pick idx=0 i=1
+  if (( $+commands[fzf] )) && [[ -t 0 && -t 1 ]]; then
+    local -a rows=()
+    for e in $entries; do
+      local -a f=("${(@s:|:)e}")
+      rows+=("$(printf '%2d  \e[38;2;228;139;180m%s\e[0m  %s  \e[38;2;127;132;163m%s\e[0m' $i "$f[1]" "${(mr:16:)f[2]}" "$f[3]")")
+      (( i++ ))
+    done
+    pick=$(print -rl -- $rows | fzf --ansi --height=60% --layout=reverse --border=rounded \
+      --prompt='dusk › ' --info=hidden --header='输入几个字筛选，回车执行，Esc 取消' \
+      --color='border:#e48bb4,prompt:#7aa2ff,pointer:#e48bb4,hl:#e48bb4,hl+:#e48bb4,header:8' ) || return 0
+    idx=${${=pick}[1]}
+  else
+    local -a opts=()
+    for e in $entries; do local -a f=("${(@s:|:)e}"); opts+=("$f[1] $f[2]|$f[3]"); done
+    _dk_choose_wide "dusk" 1 $opts || return 0
+    idx=$REPLY
+  fi
+  [[ $idx == <-> ]] && (( idx >= 1 && idx <= $#entries )) || return 0
+  local -a f=("${(@s:|:)entries[idx]}")
+  local cmd=$f[4] ask=$f[5] arg=""
+  if [[ -n $ask ]]; then
+    read -r "arg?$(print -n "  \e[38;2;228;139;180m❯\e[0m $ask：")"
+  fi
+  # run Dusk's own implementation even if the short name belongs to another tool (e.g. GCR)
+  local run=${cmd%% *}
+  local rest=${cmd#$run}
+  (( $+functions[_dk_$run] )) && [[ ${aliases[$run]} != _dk_$run ]] && run=_dk_$run
+  print
+  eval "$run$rest ${arg:+${(q)arg}}"
+  local rc=$?
+  [[ $run == $cmd[(w)1] ]] && _dk_dim "\n  下次可以直接输入：$cmd${arg:+ $arg}"
+  return $rc
+}
+
+# numbered menu that fits longer labels (used when fzf isn't installed)
+_dk_choose_wide() {
+  local title=$1 def=$2 i=1 o ans; shift 2
+  print -n "\n  \e[48;2;74;98;173m\e[38;2;246;247;252m\e[1m ? \e[0m $(_dk_c '122;162;255')\e[1m$title\e[0m\n"
+  for o in "$@"; do
+    print -n "    $(_dk_c '122;162;255')${(l:2:)i}\e[0m  ${(mr:20:)${o%%|*}}  $(_dk_c '127;132;163')${o#*|}\e[0m\n"
+    (( i++ ))
+  done
+  read -r "ans?$(print -n "     $(_dk_c '228;139;180')❯\e[0m ")输入编号（回车取消）："
+  [[ $ans == <-> ]] && (( ans >= 1 && ans <= $# )) || return 1
+  REPLY=$ans
+}
+
 dusk() {
   case $1 in
     update) _dusk_update ;;
     theme)  shift; _dusk_theme "$@" ;;
     tmux)   shift; _dusk_tmux_setup "$@" ;;
     doctor) _dusk_doctor ;;
-    "") hud ;;
+    "") _dusk_menu ;;
     help|-h|--help) _dusk_help ;;
     *) print "未知命令：$1"; _dusk_help; return 1 ;;
   esac

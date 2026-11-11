@@ -401,8 +401,8 @@ cmdline() {  # cmdline <before> <command> <after>: command in pink
   card_line "$1$2$3" "$1$PINK$BOLD$2$N$3"
 }
 cmdline "$(t '新开一个终端，或运行 ' 'Open a new terminal, or run ')" "exec zsh" ""
-cmdline "$(t '输入 ' 'Type ')" "hud" "$(t '          打开控制中心' '          for the Control Center')"
-cmdline "$(t '输入 ' 'Type ')" "dusk help" "$(t '  查看全部快捷命令' '  for every shortcut')"
+cmdline "$(t '输入 ' 'Type ')" "dusk" "$(t '   打开命令面板，所有功能都在里面' '   for the command palette (everything)')"
+cmdline "$(t '输入 ' 'Type ')" "hud" "$(t '    打开控制中心' '    for the Control Center')"
 if (( ${#NOTES[@]} )); then
   card_line ""
   card_line "$(t '还差一步' 'One more thing')" "$SKY$BOLD$(t '还差一步' 'One more thing')$N"

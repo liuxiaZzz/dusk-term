@@ -1,6 +1,6 @@
 # modules/center.zsh — Dusk Control Center (macOS + Linux)
 # A lock-screen style clock and Control Center style tiles, shown once per new tab.
-#   dusk / hud    show it again any time
+#   hud           show it again any time
 #   hud -c        compact one-liner
 # DUSK_WELCOME=1 full (default) · 2 compact · 0 off   (never automatic inside tmux)
 # Colors are ANSI theme colors, so it follows whichever iTerm2 profile is active.
@@ -69,11 +69,11 @@ _cc_collect() {
   typeset -gA CC=()
   local line
   if [[ $OSTYPE == darwin* ]]; then
-    local -a s=("${(@f)$(sysctl -n vm.loadavg hw.ncpu hw.memsize kern.boottime 2>/dev/null)}")
+    local -a s=("${(@f)$(/usr/sbin/sysctl -n vm.loadavg hw.ncpu hw.memsize kern.boottime 2>/dev/null)}")
     local -a la=(${=s[1]//[\{\}]/})
     CC[cpu]=${$(( la[1] * 100.0 / ${s[2]:-1} ))%.*}
     local pg=16384 act=0 wir=0 cmp=0
-    for line in "${(@f)$(vm_stat 2>/dev/null)}"; do
+    for line in "${(@f)$(/usr/bin/vm_stat 2>/dev/null)}"; do
       case $line in
         *"page size of"*)            pg=${${line##*of }%% *} ;;
         "Pages active:"*)            act=${${${line##*:}// /}%.} ;;
@@ -81,20 +81,22 @@ _cc_collect() {
         "Pages occupied by compressor:"*) cmp=${${${line##*:}// /}%.} ;;
       esac
     done
-    CC[mem]=$(( (act + wir + cmp) * pg * 100 / ${s[3]:-1} ))
-    CC[memtot]=$(( ${s[3]:-0} / 1073741824 ))G
+    if [[ ${s[3]} == <1-> ]]; then
+      CC[mem]=$(( (act + wir + cmp) * pg * 100 / s[3] ))
+      CC[memtot]=$(( s[3] / 1073741824 ))G
+    fi
     local boot=${${s[4]#*sec = }%%,*}
-    CC[up]=$(( EPOCHSECONDS - boot ))
+    [[ $boot == <1-> ]] && CC[up]=$(( EPOCHSECONDS - boot ))
     CC[disk]=${${(s: :)${(f)"$(df -P /System/Volumes/Data 2>/dev/null || df -P /)"}[-1]}[5]%\%}
-    line=$(pmset -g batt 2>/dev/null)
+    line=$(/usr/bin/pmset -g batt 2>/dev/null)
     if [[ $line == *InternalBattery* ]]; then
       CC[bat]=${${line##*InternalBattery*$'\t'}%%\%*}
       if [[ $line == *"; charging;"* ]]; then CC[chg]=充电中
       elif [[ $line == *"AC attached"* ]]; then CC[chg]=已接电源; fi
       [[ $line == *[0-9]:[0-9][0-9]\ remaining* ]] && CC[left]=${${line%% remaining*}##* }
     fi
-    CC[ip]=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
-    CC[os]="macOS $(sw_vers -productVersion 2>/dev/null)"
+    CC[ip]=$(/usr/sbin/ipconfig getifaddr en0 2>/dev/null || /usr/sbin/ipconfig getifaddr en1 2>/dev/null)
+    CC[os]="macOS $(/usr/bin/sw_vers -productVersion 2>/dev/null)"
   else
     local -a la=(${=$(</proc/loadavg)})
     CC[cpu]=${$(( la[1] * 100.0 / $(nproc 2>/dev/null || echo 1) ))%.*}
@@ -187,9 +189,9 @@ _cc_full() {
     local bar=""; [[ -n $5 ]] && { _cc_bar $5 $bw; bar=$REPLY; }
     _cc_card $tw "%F{4}$1 $2%f" "$v" "$bar"
   }
-  _cc_tile $_CC_ICON[cpu]  CPU  "${CC[cpu]}%%" "负载" ${CC[cpu]};          local -a t1=("${reply[@]}")
-  _cc_tile $_CC_ICON[mem]  内存 "${CC[mem]}%%" "${CC[memtot]}" ${CC[mem]}; local -a t2=("${reply[@]}")
-  _cc_tile $_CC_ICON[disk] 磁盘 "${CC[disk]}%%" "已用" ${CC[disk]};       local -a t3=("${reply[@]}")
+  _cc_tile $_CC_ICON[cpu]  CPU  "${CC[cpu]:---}%%" "负载" ${CC[cpu]:-0};          local -a t1=("${reply[@]}")
+  _cc_tile $_CC_ICON[mem]  内存 "${CC[mem]:---}%%" "${CC[memtot]}" ${CC[mem]:-0}; local -a t2=("${reply[@]}")
+  _cc_tile $_CC_ICON[disk] 磁盘 "${CC[disk]:---}%%" "已用" ${CC[disk]:-0};       local -a t3=("${reply[@]}")
   if [[ -n ${CC[gpu]} ]]; then
     _cc_tile $_CC_ICON[gpu] GPU "${CC[gpu]}%%" "${CC[gpumem]}" ${CC[gpu]}
   elif [[ -n ${CC[bat]} ]]; then
@@ -242,8 +244,7 @@ _cc_full() {
   (( $+functions[j] || $+aliases[j] )) && pills+=("j 跳转")
   pills+=("⌃R 历史" "⌃T 找文件")
   (( $+aliases[x] )) && pills+=("x 解压")
-  pills+=("hud 面板")
-  (( $+functions[dusk] )) && pills+=("dusk help")
+  (( $+functions[dusk] )) && pills+=("dusk 全部功能")
   local p bar="" k=0
   for p in $pills; do
     (( k++ % 2 )) && bar+="%K{5}%F{0} $p %f%k " || bar+="%K{4}%F{0} $p %f%k "
