@@ -175,6 +175,7 @@ dusk tmux off              # 关掉
 | `DUSK_SAFE_RM` | `1` | `0` 让 `rm` 恢复原样 |
 | `DUSK_OVERRIDE` | `0` | `1` 让 dusk 的命令覆盖已被占用的同名命令 |
 | `DUSK_P10K_COLORS` | `1` | `0` 保留你自己的 p10k 配色 |
+| `DUSK_SYNTAX_COLORS` | `1` | 输入命令时：拼对蓝色、拼错粉色。`0` 保留原样 |
 | `DUSK_WELCOME` | `1` | 新标签页的控制中心：`1` 完整、`2` 精简、`0` 关闭 |
 
 ## 安装脚本做了什么

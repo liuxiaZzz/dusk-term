@@ -6,6 +6,7 @@
 : ${DUSK_STYLE:=classic}          # classic | glass
 : ${DUSK_MODE:=split}             # split (light here, dark on remote) | dark | light
 : ${DUSK_P10K_COLORS:=1}          # 1 = recolor powerlevel10k segments
+: ${DUSK_SYNTAX_COLORS:=1}        # 1 = while typing: valid commands blue, typos pink
 : ${DUSK_TMUX_HOST:=}             # host for the tmux command, e.g. me@server; empty = off
 : ${DUSK_TMUX_SESSION:=main}      # default tmux session
 : ${DUSK_TMUX_CMD:=st}            # name of the tmux command (st, jt, ...)
@@ -66,6 +67,23 @@ if (( DUSK_P10K_COLORS )); then
     typeset -g POWERLEVEL9K_TIME_BACKGROUND=$peri            POWERLEVEL9K_TIME_FOREGROUND=$ink
   }
   (( ! $+functions[p10k] )) || p10k reload
+fi
+
+# ─── 1b. typing colors (zsh-syntax-highlighting): right = blue, typo = pink ──
+# Uses the theme's own ANSI blue (4) and pink (5), so it fits all four themes.
+if (( DUSK_SYNTAX_COLORS )); then
+  typeset -gA ZSH_HIGHLIGHT_STYLES
+  () {
+    local k
+    for k in command builtin alias suffix-alias global-alias function precommand \
+             hashed-command reserved-word arg0 autodirectory; do
+      ZSH_HIGHLIGHT_STYLES[$k]='fg=4,bold'
+    done
+    ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=5'
+    ZSH_HIGHLIGHT_STYLES[path]='underline'
+    ZSH_HIGHLIGHT_STYLES[single-quoted-argument]='fg=3'
+    ZSH_HIGHLIGHT_STYLES[double-quoted-argument]='fg=3'
+  }
 fi
 
 # ─── 2. remote sessions use the remote profile, then switch back ────────────
