@@ -366,6 +366,7 @@ step "$(t 写入配置 Configure)"
 mkdir -p "$CONF_DIR/modules"
 cp "$REPO_DIR/zsh/dusk.zsh" "$CONF_DIR/"
 cp "$REPO_DIR"/zsh/modules/*.zsh "$CONF_DIR/modules/"
+mkdir -p "$CONF_DIR/viewer" && cp "$REPO_DIR/viewer/dusk_view.py" "$CONF_DIR/viewer/"
 if [[ $P10K_LAYOUT == 0 && $(cfg_get DUSK_P10K_LAYOUT) == 1 ]]; then
   P10K_LAYOUT=1   # keep the layout we set up on an earlier run
 fi

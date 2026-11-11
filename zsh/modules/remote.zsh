@@ -74,3 +74,116 @@ if (( $+commands[docker] )); then
   }
   _dk_bind dsh _dk_dsh; _dk_bind dlog _dk_dlog; _dk_bind dockeradd _dk_dockeradd
 fi
+
+# ─── peek: zoom into huge images like QuPath; tiles are cut where the files are ──
+#   peek host:/data/slides      browse a folder on a server in your local browser
+#   peek host:/data/a.svs       open one image (whole-slide .svs .ndpi .mrxs …, or png/jpg/tif)
+#   peek ~/Pictures             a local folder or file
+#   peek --setup [host]         install what it needs there (pip --user: pillow, openslide)
+# Needs nothing installed on the server beyond Python + those packages: the viewer is sent
+# over ssh. DUSK_VIEW_PYTHON picks a specific interpreter.
+: ${DUSK_VIEW_PYTHON:=}
+
+# shell snippet that sets $PY to a Python with Pillow (preferring one that also has openslide)
+_dk_view_pick_py() {
+  REPLY='PY=$DVP; if [ -z "$PY" ]; then for p in "$HOME/miniconda3/bin/python3" "$HOME/anaconda3/bin/python3" "$HOME/miniforge3/bin/python3" "$HOME/mambaforge/bin/python3" "$(command -v python3)"; do [ -x "$p" ] || continue; [ -z "$FIRST" ] && FIRST=$p; if "$p" -c "import PIL, openslide" 2>/dev/null; then PY=$p; break; fi; [ -z "$PILPY" ] && "$p" -c "import PIL" 2>/dev/null && PILPY=$p; done; PY=${PY:-${PILPY:-$FIRST}}; fi; [ -n "$PY" ] || { echo "DUSK_VIEW_ERROR 找不到 python3"; exit 2; }'
+}
+
+_dk_free_port() {
+  local p
+  local n
+  for n in {1..30}; do
+    p=$(( 20000 + RANDOM % 20000 ))
+    (( $+commands[lsof] )) && lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1 && continue
+    REPLY=$p; return 0
+  done
+  return 1
+}
+
+_dk_peek_setup() {   # _dk_peek_setup [host]
+  local host=$1; _dk_view_pick_py
+  local cmd="DVP=${(qq)DUSK_VIEW_PYTHON}; $REPLY; echo \"→ \$PY\"; \"\$PY\" -m pip install --user --upgrade pillow openslide-python openslide-bin"
+  _dk_pink "  安装看图需要的 Python 包（pillow、openslide）到 ${host:-本机}，只装在你的用户目录"
+  if [[ -n $host ]]; then command ssh -o ClearAllForwardings=yes "$host" "$cmd"
+  else sh -c "$cmd"; fi
+}
+
+_dk_peek() {
+  if [[ -z $1 || $1 == -h || $1 == --help ]]; then
+    print "用法: peek 服务器:/路径      在本机浏览器里看服务器上的大图或文件夹"
+    print "      peek ~/本机路径        看本机的图"
+    print "      peek --setup [服务器]  安装需要的 Python 包"
+    return 0
+  fi
+  [[ $1 == --setup ]] && { _dk_peek_setup "$2"; return }
+  local script=$DUSK_DIR/viewer/dusk_view.py
+  [[ -f $script ]] || { print "找不到看图程序，先运行 dusk update"; return 1 }
+
+  local target=$1 host="" tpath=$1
+  if [[ ! -e $target && $target == *:* && ${target%%:*} != */* ]]; then
+    host=${target%%:*}; tpath=${target#*:}; [[ -z $tpath ]] && tpath=.
+  fi
+  if [[ -z $host && -n $SSH_CONNECTION ]]; then      # on a server: the browser lives on your Mac
+    print "这里是服务器，浏览器在你的电脑上。在你的 Mac 上运行："
+    _dk_pink "  peek ${HOST%%.*}:${tpath:A}"
+    _dk_dim  "  （${HOST%%.*} 换成你 ~/.ssh/config 里这台服务器的名字）"
+    return 0
+  fi
+  [[ -n $host || -e $tpath ]] || { print "没有这个文件或文件夹：$tpath"; return 1 }
+
+  setopt local_options no_monitor no_notify
+  local attempt log err pid state port
+  for attempt in 1 2; do
+    _dk_free_port || { print "找不到空闲端口"; return 1 }; port=$REPLY
+    log=$(mktemp) err=$(mktemp)
+    if [[ -n $host ]]; then
+      _dk_view_pick_py
+      local b64=$(base64 < $script | tr -d '\n')
+      local cmd="DVP=${(qq)DUSK_VIEW_PYTHON}; $REPLY; exec \"\$PY\" -u -c \"import base64;exec(compile(base64.b64decode('$b64'),'dusk_view','exec'))\" --port $port --path ${(qq)tpath}"
+      # -tt: a terminal on the server, so the viewer gets hung up on when this connection ends
+      command ssh -tt -o ServerAliveInterval=30 -o LogLevel=ERROR -L $port:127.0.0.1:$port "$host" "$cmd" >$log 2>$err </dev/null &
+    else
+      ${DUSK_VIEW_PYTHON:-python3} -u $script --port $port --path "$tpath" >$log 2>$err &
+    fi
+    pid=$!
+    local frames='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏' i=0; state=""
+    while (( i < 600 )); do                          # up to ~60 s (first ssh + loading a big image)
+      state=$(tr -d '\r' < $log 2>/dev/null | grep -m1 -oE '^DUSK_VIEW_(READY|MISSING|ERROR).*')
+      [[ -n $state ]] && break
+      kill -0 $pid 2>/dev/null || break
+      printf '\r  \e[38;2;228;139;180m%s\e[0m 正在 %s 上启动看图服务…' "${frames:$(( i++ % 10 )):1}" "${host:-本机}"
+      sleep 0.1
+    done
+    printf '\r\e[K'
+    if [[ $state == DUSK_VIEW_ERROR*端口* && $attempt == 1 ]]; then kill $pid 2>/dev/null; command rm -f $log $err; continue; fi
+    break
+  done
+
+  {
+    case $state in
+      DUSK_VIEW_READY*)
+        local url="http://localhost:$port/"
+        _dk_pink "  ✓ 正在浏览 ${host:+$host:}$tpath"
+        print "    $url"
+        grep -q DUSK_VIEW_NO_OPENSLIDE $log && \
+          _dk_dim "    （${host:-本机}没有 openslide：普通图片能看，.svs 等切片需要先 peek --setup ${host}）"
+        _dk_dim "    滚轮缩放 · 拖动平移 · ←/→ 上一张/下一张 · Esc 回文件夹 · 这里按 Ctrl-C 结束"
+        (( ${DUSK_VIEW_NO_OPEN:-0} )) || { (( $+commands[open] )) && open "$url" }
+        wait $pid ;;
+      DUSK_VIEW_MISSING*)
+        print "  ${host:-本机}缺少 Python 包：${state#DUSK_VIEW_MISSING }"
+        if _dk_ask "  现在装上吗？（pip --user，只装在你的用户目录）"; then
+          _dk_peek_setup "$host" && _dk_peek "$@"
+        fi ;;
+      DUSK_VIEW_ERROR*)
+        print "  ${state#DUSK_VIEW_ERROR }" ;;
+      *)
+        print "  看图服务没有启动起来："
+        grep -vE 'Address already in use|cannot listen to port|Could not request local forwarding|^bind' $err | tail -n 6 | sed 's/^/    /' ;;
+    esac
+  } always {
+    kill $pid 2>/dev/null
+    command rm -f $log $err
+  }
+}
+_dk_bind peek _dk_peek

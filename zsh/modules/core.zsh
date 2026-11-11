@@ -31,6 +31,7 @@ _dusk_help() {
   if (( ${DUSK_MODULES[(Ie)remote]} )); then
     _dk_blue "  remote"
     print "    listen             SSH 端口转发（L 本地 / R 远程 / D socks5），可交互"
+    print "    peek 服务器:/路径   像 QuPath 一样看大图和切片（服务器切图，本机浏览器看）"
     if [[ ${DUSK_ROLE:-local} == server ]]; then
       print "    upload [-d]        从本机上传文件（trz）   download [文件]  下载到本机（tsz）"
     else
@@ -178,6 +179,7 @@ _dusk_doctor() {
 _dusk_entries() {
   reply=()
   reply+=("󰕮|控制中心|时钟、CPU、内存、磁盘、电池一览|hud|")
+  (( $+functions[_dk_peek] )) && reply+=("󰋩|看大图|像 QuPath 一样缩放浏览服务器上的切片和大图|peek|路径（服务器:/路径 或 本机路径）")
   if [[ -n ${DUSK_TMUX_HOSTS:-$DUSK_TMUX_HOST} ]] && (( $+functions[$DUSK_TMUX_CMD] )); then
     reply+=("|进服务器 tmux|列出 ${${DUSK_TMUX_HOSTS:-$DUSK_TMUX_HOST}// /、} 上的会话，选一个进入|$DUSK_TMUX_CMD|")
   fi
