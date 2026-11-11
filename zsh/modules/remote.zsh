@@ -133,8 +133,11 @@ _dk_peek() {
   fi
   [[ -n $host || -e $tpath ]] || { print "没有这个文件或文件夹：$tpath"; return 1 }
 
-  setopt local_options no_monitor no_notify
+  setopt local_options local_traps no_monitor no_notify
   local attempt log err pid state port
+  # closing the terminal tab (HUP) or killing the shell must not leave the ssh tunnel behind
+  trap '[[ -n $pid ]] && kill $pid 2>/dev/null; exit 129' HUP
+  trap '[[ -n $pid ]] && kill $pid 2>/dev/null; exit 143' TERM
   for attempt in 1 2; do
     _dk_free_port || { print "找不到空闲端口"; return 1 }; port=$REPLY
     log=$(mktemp) err=$(mktemp)
