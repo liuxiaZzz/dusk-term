@@ -12,7 +12,7 @@ _dusk_help() {
   if (( ${DUSK_MODULES[(Ie)theme]} )) && [[ ${DUSK_ROLE:-local} == local ]]; then
     _dk_blue "  theme"
     print "    ssh / tssh / mosh  远程时自动切换到 ${DUSK_REMOTE_PROFILE:-Dusk Dark}（iTerm2）"
-    [[ -n $DUSK_TMUX_HOST ]] && print "    $DUSK_TMUX_CMD [会话名]        连接 $DUSK_TMUX_HOST 上的 tmux（iTerm2 -CC）"
+    [[ -n ${DUSK_TMUX_HOSTS:-$DUSK_TMUX_HOST} ]] && print "    $DUSK_TMUX_CMD               选一个服务器上的 tmux 会话进入（$DUSK_TMUX_CMD 名字 直接进）"
     print "    dusk theme         换风格 / 本机远程配色（立即生效）"
     print "    dusk tmux          设置一键进服务器 tmux（服务器、会话、命令名、配色）"
   fi
@@ -112,35 +112,45 @@ _dusk_theme() {
 }
 
 # ─── dusk tmux ────────────────────────────────────────────────────────────────
-#   dusk tmux                     set it up with questions
-#   dusk tmux me@server [cmd]     or directly;   dusk tmux off   to remove
+#   dusk tmux                         set it up with questions
+#   dusk tmux host1 host2 [--cmd jt]  or directly (the first host is the default)
+#   dusk tmux off                     remove it
 _dusk_tmux_setup() {
-  local host=$DUSK_TMUX_HOST sess=$DUSK_TMUX_SESSION cmd=$DUSK_TMUX_CMD prof=$DUSK_TMUX_PROFILE
+  local hosts="${DUSK_TMUX_HOSTS:-$DUSK_TMUX_HOST}" sess=$DUSK_TMUX_SESSION cmd=$DUSK_TMUX_CMD prof=$DUSK_TMUX_PROFILE
   if [[ $1 == off ]]; then
     [[ -n $DUSK_TMUX_CMD ]] && (( $+functions[$DUSK_TMUX_CMD] )) && unfunction $DUSK_TMUX_CMD
-    _dk_config_set DUSK_TMUX_HOST ""; _dk_dim "  已关闭"; return
+    _dk_config_set DUSK_TMUX_HOST ""; _dk_config_set DUSK_TMUX_HOSTS ""; _dk_dim "  已关闭"; return
   fi
   if (( $# )); then
-    host=$1; [[ -n $2 ]] && cmd=$2
+    local -a hs=()
+    while (( $# )); do
+      case $1 in --cmd) cmd=$2; shift 2 ;; *) hs+=($1); shift ;; esac
+    done
+    (( $#hs )) && hosts="${hs[*]}"
   else
     print
-    read -r "host?  服务器（user@host 或 ~/.ssh/config 里的名字）[${host:-无}]: " ; host=${host:-$DUSK_TMUX_HOST}
-    [[ -n $host ]] || { _dk_dim "  没有填写服务器，已取消"; return 1 }
-    read -r "sess?  默认会话名 [${DUSK_TMUX_SESSION}]: "; sess=${sess:-$DUSK_TMUX_SESSION}
-    read -r "cmd?  命令叫什么 [${DUSK_TMUX_CMD}]: ";     cmd=${cmd:-$DUSK_TMUX_CMD}
+    _dk_dim "  服务器填 user@host 或 ~/.ssh/config 里的名字；可以填多个，用空格隔开，第一个是默认"
+    local ans
+    read -r "ans?  服务器 [${hosts:-无}]: "; hosts=${ans:-$hosts}
+    [[ -n $hosts ]] || { _dk_dim "  没有填写服务器，已取消"; return 1 }
+    read -r "ans?  默认会话名 [${sess}]: "; sess=${ans:-$sess}
+    read -r "ans?  命令叫什么 [${cmd}]: ";   cmd=${ans:-$cmd}
     _dk_choose "tmux 窗口用哪个配色" 1 \
       "跟随远程|现在是 $DUSK_REMOTE_PROFILE，换主题会跟着变" "Dark|Dusk Dark" "GlassDk|Dusk Glass Dark" "Light|Dusk Light" "GlassLt|Dusk Glass Light"
     case $REPLY in 2) prof="Dusk Dark";; 3) prof="Dusk Glass Dark";; 4) prof="Dusk Light";; 5) prof="Dusk Glass Light";; *) prof="";; esac
   fi
   [[ $cmd =~ '^[A-Za-z_][A-Za-z0-9_-]*$' ]] || { print "命令名只能用字母、数字、- 和 _"; return 1 }
   [[ -n $DUSK_TMUX_CMD && $DUSK_TMUX_CMD != $cmd ]] && (( $+functions[$DUSK_TMUX_CMD] )) && unfunction $DUSK_TMUX_CMD
-  _dk_config_set DUSK_TMUX_HOST "$host"
+  local -a hl=(${=hosts})
+  _dk_config_set DUSK_TMUX_HOST "$hl[1]"
+  _dk_config_set DUSK_TMUX_HOSTS "${hl[*]}"
   _dk_config_set DUSK_TMUX_SESSION "$sess"
   _dk_config_set DUSK_TMUX_CMD "$cmd"
   _dk_config_set DUSK_TMUX_PROFILE "$prof"
   _dusk_bind_tmux
-  print; _dk_pink "  ✓ $cmd → $host 上的 tmux（会话 $sess，配色 ${prof:-跟随远程}）"
-  _dk_dim "  $cmd 进默认会话，$cmd 名字 进别的会话"
+  print; _dk_pink "  ✓ $cmd → ${hl[*]} 上的 tmux（默认 $hl[1]，会话 $sess，配色 ${prof:-跟随远程}）"
+  _dk_dim "  $cmd          列出所有服务器上的会话，选一个进入或新建"
+  _dk_dim "  $cmd 名字     进默认服务器上的这个会话      $cmd 服务器 名字   进指定服务器"
 }
 
 _dusk_update() {
@@ -168,8 +178,8 @@ _dusk_doctor() {
 _dusk_entries() {
   reply=()
   reply+=("󰕮|控制中心|时钟、CPU、内存、磁盘、电池一览|hud|")
-  if [[ -n $DUSK_TMUX_HOST ]] && (( $+functions[$DUSK_TMUX_CMD] )); then
-    reply+=("|进服务器 tmux|连到 $DUSK_TMUX_HOST 的 tmux|$DUSK_TMUX_CMD|会话名（回车 = $DUSK_TMUX_SESSION）")
+  if [[ -n ${DUSK_TMUX_HOSTS:-$DUSK_TMUX_HOST} ]] && (( $+functions[$DUSK_TMUX_CMD] )); then
+    reply+=("|进服务器 tmux|列出 ${${DUSK_TMUX_HOSTS:-$DUSK_TMUX_HOST}// /、} 上的会话，选一个进入|$DUSK_TMUX_CMD|")
   fi
   (( $+functions[j] || $+aliases[j] )) && reply+=("|跳转目录|跳到常去的目录|j|目录关键词")
   (( $+functions[_dk_listen] )) && reply+=("󰛳|端口转发|SSH 转发远程端口到本机|listen|")

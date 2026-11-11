@@ -15,6 +15,12 @@
       "Unlimited Scrollback": true,
       "Use Separate Colors for Light and Dark Mode": false,
       "Use Tab Color": true,
+      "Badge Text": "\\(user.duskHost)",
+      "Badge Font": "JetBrainsMonoNFM-Bold",
+      "Badge Max Width": 0.25,
+      "Badge Max Height": 0.08,
+      "Badge Right Margin": 18,
+      "Badge Top Margin": 12,
       "Blur Radius": 24,
       "Background Color": {
         "Red Component": 0.043137254901960784,
@@ -83,7 +89,7 @@
         "Red Component": 1.0,
         "Green Component": 0.5607843137254902,
         "Blue Component": 0.8156862745098039,
-        "Alpha Component": 1.0,
+        "Alpha Component": 0.22,
         "Color Space": "sRGB"
       },
       "Tab Color": {
@@ -221,6 +227,12 @@
       "Unlimited Scrollback": true,
       "Use Separate Colors for Light and Dark Mode": false,
       "Use Tab Color": true,
+      "Badge Text": "\\(user.duskHost)",
+      "Badge Font": "JetBrainsMonoNFM-Bold",
+      "Badge Max Width": 0.25,
+      "Badge Max Height": 0.08,
+      "Badge Right Margin": 18,
+      "Badge Top Margin": 12,
       "Blur Radius": 16,
       "Background Color": {
         "Red Component": 0.9098039215686274,
@@ -289,7 +301,7 @@
         "Red Component": 0.8901960784313725,
         "Green Component": 0.6509803921568628,
         "Blue Component": 0.7607843137254902,
-        "Alpha Component": 1.0,
+        "Alpha Component": 0.22,
         "Color Space": "sRGB"
       },
       "Tab Color": {
@@ -427,6 +439,12 @@
       "Unlimited Scrollback": true,
       "Use Separate Colors for Light and Dark Mode": false,
       "Use Tab Color": false,
+      "Badge Text": "\\(user.duskHost)",
+      "Badge Font": "JetBrainsMonoNFM-Bold",
+      "Badge Max Width": 0.25,
+      "Badge Max Height": 0.08,
+      "Badge Right Margin": 18,
+      "Badge Top Margin": 12,
       "Blur Radius": 30,
       "Only The Default BG Color Uses Transparency": true,
       "Minimum Contrast": 0.2,
@@ -497,7 +515,7 @@
         "Red Component": 0.8901960784313725,
         "Green Component": 0.6509803921568628,
         "Blue Component": 0.7607843137254902,
-        "Alpha Component": 1.0,
+        "Alpha Component": 0.22,
         "Color Space": "sRGB"
       },
       "Tab Color": {
@@ -635,6 +653,12 @@
       "Unlimited Scrollback": true,
       "Use Separate Colors for Light and Dark Mode": false,
       "Use Tab Color": false,
+      "Badge Text": "\\(user.duskHost)",
+      "Badge Font": "JetBrainsMonoNFM-Bold",
+      "Badge Max Width": 0.25,
+      "Badge Max Height": 0.08,
+      "Badge Right Margin": 18,
+      "Badge Top Margin": 12,
       "Blur Radius": 30,
       "Only The Default BG Color Uses Transparency": true,
       "Minimum Contrast": 0.2,
@@ -705,7 +729,7 @@
         "Red Component": 1.0,
         "Green Component": 0.6235294117647059,
         "Blue Component": 0.8235294117647058,
-        "Alpha Component": 1.0,
+        "Alpha Component": 0.22,
         "Color Space": "sRGB"
       },
       "Tab Color": {

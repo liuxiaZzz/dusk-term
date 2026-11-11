@@ -226,7 +226,7 @@
 	<key>Badge Color</key>
 	<dict>
 		<key>Alpha Component</key>
-		<real>1.0</real>
+		<real>0.22</real>
 		<key>Blue Component</key>
 		<real>0.7607843137254902</real>
 		<key>Color Space</key>

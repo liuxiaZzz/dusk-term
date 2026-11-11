@@ -117,6 +117,16 @@ GLASS = {
     "Use Tab Color": False,
 }
 
+# hostname watermark (iTerm2 badge): shows the user variable duskHost, set by the shell on ssh
+BADGE = {
+    "Badge Text": "\\(user.duskHost)",
+    "Badge Font": "JetBrainsMonoNFM-Bold",
+    "Badge Max Width": 0.25,
+    "Badge Max Height": 0.08,
+    "Badge Right Margin": 18,
+    "Badge Top Margin": 12,
+}
+
 COMMON = {
     "Transparency": 0.05,
     "Blur": True,
@@ -147,8 +157,11 @@ def color(hexstr, alpha=1.0):
             "Alpha Component": alpha, "Color Space": "sRGB"}
 
 
+ALPHA = {"Cursor Guide Color": 0.3, "Badge Color": 0.22}
+
+
 def colors_of(palette):
-    return {k: color(v, 0.3 if k == "Cursor Guide Color" else 1.0) for k, v in palette.items()}
+    return {k: color(v, ALPHA.get(k, 1.0)) for k, v in palette.items()}
 
 
 def main():
@@ -159,7 +172,7 @@ def main():
         cols = colors_of(palette)
         with open(os.path.join(HERE, "colors", f"{name}.itermcolors"), "wb") as f:
             plistlib.dump(cols, f)
-        profiles.append({"Name": name, "Guid": guid, **COMMON, **extra, **cols})
+        profiles.append({"Name": name, "Guid": guid, **COMMON, **BADGE, **extra, **cols})
     with open(os.path.join(HERE, "iterm", "dusk.json"), "w") as f:
         json.dump({"Profiles": profiles}, f, indent=2)
     print("built colors/*.itermcolors and iterm/dusk.json")

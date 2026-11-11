@@ -60,7 +60,7 @@ MODULES=${MODULES:-${PREV_MODULES:-shell,theme,tools,remote}}
 ROLE=${ROLE:-$(cfg_get DUSK_ROLE)}
 PREV_STYLE=$(cfg_get DUSK_STYLE); PREV_MODE=$(cfg_get DUSK_MODE)
 TMUX_SESSION=$(cfg_get DUSK_TMUX_SESSION); TMUX_CMD=$(cfg_get DUSK_TMUX_CMD); TMUX_PROFILE=$(cfg_get DUSK_TMUX_PROFILE)
-PREV_TMUX_HOST=$(cfg_get DUSK_TMUX_HOST)
+PREV_TMUX_HOST=$(cfg_get DUSK_TMUX_HOSTS); PREV_TMUX_HOST=${PREV_TMUX_HOST:-$(cfg_get DUSK_TMUX_HOST)}
 has_mod() { [[ ",$MODULES," == *",$1,"* ]]; }
 [[ -n $ROLE ]] || ROLE=$([[ $OS == Darwin ]] && echo local || echo server)
 [[ $ROLE == local || $ROLE == server ]] || { echo "--role must be local or server" >&2; exit 1; }
@@ -225,7 +225,7 @@ if (( WANT_THEME )); then
     TMUX_HOST=$PREV_TMUX_HOST
     if (( CAN_ASK )); then
       printf '\n  %s ? %s %s%s%s\n' "$BG_SAPPHIRE$WHITE$BOLD" "$N" "$BLUE$BOLD" "$(t '一键进服务器 tmux（可选）' 'One command into tmux on a server (optional)')" "$N"
-      printf '     %s%s%s\n' "$MUTE" "$(t '填 user@host 或 ~/.ssh/config 里的名字；回车跳过，以后可用 dusk tmux 设置' 'user@host or a name from ~/.ssh/config; Enter to skip (later: dusk tmux)')" "$N"
+      printf '     %s%s%s\n' "$MUTE" "$(t '填 user@host 或 ~/.ssh/config 里的名字，多个用空格隔开；回车跳过，以后可用 dusk tmux 设置' 'user@host or names from ~/.ssh/config, space separated; Enter to skip (later: dusk tmux)')" "$N"
       printf '     %s❯%s %s' "$PINK" "$N" "$(t "服务器 [${TMUX_HOST:-跳过}]：" "Server [${TMUX_HOST:-skip}]: ")"
       IFS= read -r ans </dev/tty || ans=""
       [[ -n $ans ]] && TMUX_HOST=$ans
@@ -378,7 +378,8 @@ cfg_line() { [[ -n $2 ]] && printf ": \${%s:='%s'}\n" "$1" "${2//\'/}"; return 0
   cfg_line DUSK_P10K_LAYOUT "$P10K_LAYOUT"
   cfg_line DUSK_STYLE "$STYLE"
   cfg_line DUSK_MODE "$MODE"
-  cfg_line DUSK_TMUX_HOST "$TMUX_HOST"
+  cfg_line DUSK_TMUX_HOST "${TMUX_HOST%% *}"
+  cfg_line DUSK_TMUX_HOSTS "$TMUX_HOST"
   cfg_line DUSK_TMUX_SESSION "$TMUX_SESSION"
   cfg_line DUSK_TMUX_CMD "$TMUX_CMD"
   cfg_line DUSK_TMUX_PROFILE "$TMUX_PROFILE"

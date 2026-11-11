@@ -125,7 +125,7 @@ GCR 更新只会覆盖它自己的文件，dusk 放在 `~/.config/dusk`，互不
 | `upload` · `download [文件]` | 在服务器上运行，弹出本地文件框上传 / 下载到本地 |
 | `dps` · `dsh <容器>` · `dlog <容器>` | docker ps / 进容器 / 看日志 |
 | `dockeradd [用户]` | Linux 上免 sudo 使用 docker |
-| `st [会话名]` | 一键进服务器的 tmux（iTerm2 原生集成）。服务器、命令名、配色用 `dusk tmux` 设置 |
+| `st` | 列出所有服务器上的 tmux 会话（窗口数、是否已连接、最近活动），选一个进入或新建。`st 名字` 直接进默认服务器上的会话，`st 服务器 名字` 进指定服务器。服务器、命令名、配色用 `dusk tmux` 设置 |
 
 **shell**
 
@@ -154,7 +154,7 @@ GCR 更新只会覆盖它自己的文件，dusk 放在 `~/.config/dusk`，互不
 dusk theme                 # 菜单里选风格和本机/远程配色，当前标签页立即生效
 dusk theme glass split     # 或者直接说：classic|glass  split|dark|light
 dusk tmux                  # 设置一键进 tmux：服务器、默认会话、命令名（st / jt …）、窗口配色
-dusk tmux me@server jt     # 或者直接说
+dusk tmux me@a me@b --cmd jt   # 或者直接说：可以多台服务器，第一台是默认
 dusk tmux off              # 关掉
 ```
 
@@ -176,6 +176,7 @@ dusk tmux off              # 关掉
 | `DUSK_OVERRIDE` | `0` | `1` 让 dusk 的命令覆盖已被占用的同名命令 |
 | `DUSK_P10K_COLORS` | `1` | `0` 保留你自己的 p10k 配色 |
 | `DUSK_SYNTAX_COLORS` | `1` | 输入命令时：拼对蓝色、拼错粉色。`0` 保留原样 |
+| `DUSK_BADGE` | `1` | ssh 到服务器时，窗口右上角显示一个小而淡的主机名水印。`0` 关闭 |
 | `DUSK_WELCOME` | `1` | 新标签页的控制中心：`1` 完整、`2` 精简、`0` 关闭 |
 
 ## 安装脚本做了什么
