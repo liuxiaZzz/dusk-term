@@ -1,0 +1,27 @@
+Sakura Term
+Copyright 2026 Sakura Term contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+---------------------------------------------------------------------------
+Portions of zsh/modules/tools.zsh, zsh/modules/remote.zsh and install.sh are
+adapted from GCR (https://github.com/gaojunbin/GCR) by Junbin Gao, released
+under the Apache License, Version 2.0.
+
+Adapted ideas and command names include: trash-based rm (del / delf /
+empty_trash), git shortcuts (gita, gitaa, gitb, gitc, gitch, gitl, gitr,
+gitpl, gitps, gitst), sz, pid, pathadd, mychmod / mychown, listen (SSH port
+forwarding), upload / download (trzsz), dockeradd, and the oh-my-zsh +
+powerlevel10k + plugin setup.
+
+Changes made: the code was rewritten for macOS and Linux portability; the
+interactive menus became commands that also accept arguments; site-specific
+features (VPN/proxy tools, self-hosted server apps, HPC-cluster helpers,
+auto-update from the upstream repo) were removed; gitps pushes the current
+branch instead of master; the trash follows each OS's own trash location.
+---------------------------------------------------------------------------
+
+Third-party projects installed (not bundled) by install.sh keep their own
+licenses: oh-my-zsh (MIT), powerlevel10k (MIT), zsh-autosuggestions (MIT),
+zsh-syntax-highlighting (BSD-3-Clause), fzf (MIT), zoxide (MIT),
+trzsz-ssh / trzsz-go (MIT).

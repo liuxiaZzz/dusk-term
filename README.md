@@ -1,111 +1,151 @@
 # Sakura Term 🌸
 
-一套蓝粉配色的 iTerm2 + zsh 配置：一明一暗两个主题，本地用浅色、连远程自动切深色，外加 powerlevel10k 配色和几个顺手的小工具。
+蓝粉配色的终端全家桶：一明一暗两个 iTerm2 主题、开箱即用的 zsh 环境，加上一套日常和远程快捷命令。macOS 和 Linux 通用。
 
-A blue-and-pink iTerm2 + zsh setup: a light and a dark theme, automatic switching to the dark one on ssh, matching powerlevel10k colors, and a few small shell helpers.
+A blue-and-pink terminal kit: light + dark iTerm2 themes, a ready-to-go zsh setup, and everyday / remote shortcuts. Works on macOS and Linux.
 
 ![preview](docs/preview.svg)
 
-## 包含什么
-
-| | 说明 |
-|---|---|
-| **Mist Sakura**（浅色） | 雾灰粉底 + 墨蓝字，粉色命令、蓝色目录。适合本地日常。 |
-| **Sakura Glass**（深色） | 宝石蓝底 + 冷白字，樱粉点缀，5% 透明 + 毛玻璃。用于远程。 |
-| **自动切换** | 敲 `ssh` / `tssh` / `mosh` 时窗口切成 Sakura Glass，退出后切回原来的主题。 |
-| **p10k 配色** | powerlevel10k 提示栏换成六种低饱和蓝粉色块（没装 p10k 也不影响）。 |
-| **欢迎面板** | 新标签页显示一个小的 "Command Center"，颜色跟随主题，明暗都协调。 |
-| **`st` 命令** | 一键 ssh 到你的服务器并进入 tmux（iTerm2 原生 tmux 集成 `-CC`）。 |
-
 ## 安装
 
-需要 macOS + [iTerm2](https://iterm2.com) + zsh。
-
 ```bash
-git clone https://github.com/liuxiaZzz/sakura-term.git
-cd sakura-term
-./install.sh
+git clone https://github.com/liuxiaZzz/sakura-term.git ~/.sakura-term
+~/.sakura-term/install.sh
 ```
 
-想顺便启用 `st`（连到服务器的 tmux）：
+装完新开一个终端（或 `exec zsh`），输入 `sakura` 查看所有快捷命令。
+
+macOS 上再做一步：iTerm2 → **Settings → Profiles** → 选 **Mist Sakura** → **Other Actions… → Set as Default**。
+
+> 建议 clone 到 `~/.sakura-term`，以后 `sakura update` 就能一键更新。
+
+### 只装一部分
+
+四个模块可以自由组合：
 
 ```bash
-./install.sh --tmux-host me@my-server
+~/.sakura-term/install.sh --modules theme,tools      # 只要主题和日常命令
+~/.sakura-term/install.sh --no-deps                  # 不下载任何依赖（服务器离线时）
+~/.sakura-term/install.sh --themes-only              # 只装 iTerm2 主题
+~/.sakura-term/install.sh --tmux-host me@server      # 启用 st（一键进服务器 tmux）
 ```
 
-只要 iTerm2 主题、不动 zsh：
+| 模块 | 内容 |
+|---|---|
+| `shell` | oh-my-zsh + powerlevel10k + 自动补全建议 + 语法高亮，fzf，zoxide（`j` 跳目录） |
+| `theme` | 两个 iTerm2 主题、p10k 蓝粉配色、远程自动切主题、欢迎面板、`st` |
+| `tools` | 回收站式 `rm`、git 缩写、磁盘/进程/端口/权限等小工具 |
+| `remote` | SSH 端口转发 `listen`、trzsz 拖拽传文件、docker 辅助 |
 
-```bash
-./install.sh --themes-only
-```
+## 主题
 
-装完之后：
+| | |
+|---|---|
+| **Mist Sakura**（浅色） | 雾灰粉底 + 墨蓝字，粉色命令、蓝色目录。本地日常用。 |
+| **Sakura Glass**（深色） | 宝石蓝底 + 冷白字，樱粉点缀，5% 透明 + 毛玻璃。远程用。 |
 
-1. iTerm2 → **Settings → Profiles** → 选 **Mist Sakura** → **Other Actions… → Set as Default**
-2. 新开一个标签页即可。
+- 敲 `ssh` / `tssh` / `mosh` 时窗口自动切成 Sakura Glass，退出后切回原来的主题（iTerm2）。
+- p10k 提示栏是六种低饱和蓝粉色块，Linux 上只要终端支持真彩色也一样。
+- 色板里的"绿色"槽位换成了樱粉，所以命令高亮、`git status` 新文件都是粉色。
 
-图标需要 Nerd Font，没有的话：
+## 快捷命令
 
-```bash
-brew install --cask font-jetbrains-mono-nerd-font
-```
+输入 `sakura` 随时查看。
 
-## 安装脚本做了什么
+**日常（tools）**
 
-- 把 `iterm/sakura-term.json` 复制到 `~/Library/Application Support/iTerm2/DynamicProfiles/`（iTerm2 动态配置，实时生效，不改你已有的配置文件）
-- 把 `zsh/sakura-term.zsh` 复制到 `~/.config/sakura-term/`
-- 在 `~/.zshrc` 末尾加一个 `# >>> sakura-term >>>` 区块来加载它（会先备份成 `.zshrc.bak-sakura-term`）
+| 命令 | 作用 |
+|---|---|
+| `rm` / `del <文件>` | 移到回收站，可以恢复（macOS 用系统废纸篓，Linux 用 `~/.local/share/Trash`） |
+| `delf <文件>` | 真正删除 |
+| `empty_trash` | 清空回收站（会确认） |
+| `gita` `gitaa` `gitb` `gitst` `gitl` `gitr` `gitpl` `gitps` | git add / add . / branch / status / log / reset / pull / push 当前分支 |
+| `gitc [说明]` | 提交；不带参数会问你 |
+| `gitch [分支]` | 切分支；不带参数用 fzf 选 |
+| `sz` · `sz <路径> [深度]` | 看磁盘 · 看目录大小（按大小排序） |
+| `szn [目录]` | 数文件个数 |
+| `pid <关键词>` | 查进程；不带参数且有 NVIDIA 时显示 GPU 进程 |
+| `port <端口>` | 谁在监听这个端口 |
+| `pathadd <目录> [-s]` | 加到 PATH，`-s` 永久写入 |
+| `mychmod` / `mychown <目录> <值>` | 递归改权限 / 所有者（会确认，必要时用 sudo） |
+| `ll` `la` `l` `cl` `sc` | 列表（有 eza 时自动用 eza）/ 清屏 / 重新加载 zsh |
 
-重复运行是安全的，只会替换自己的文件和区块。
+**远程（remote）**
 
-## 配置
+| 命令 | 作用 |
+|---|---|
+| `listen` | 交互式 SSH 端口转发；也可以直接 `listen L 服务器 8888`（本机访问服务器的 8888） |
+| `listen R 服务器 3000` · `listen D 服务器 1080` | 远程转发 · socks5 代理 |
+| `tssh 服务器` | 带拖拽上传的 ssh（trzsz） |
+| `upload` · `download [文件]` | 在服务器上运行，弹出本地文件框上传 / 下载到本地 |
+| `dps` · `dsh <容器>` · `dlog <容器>` | docker ps / 进容器 / 看日志 |
+| `dockeradd [用户]` | Linux 上免 sudo 使用 docker |
+| `st [会话名]` | 一键进服务器的 tmux（iTerm2 原生集成，需 `--tmux-host`） |
 
-在 `~/.zshrc` 的 sakura-term 区块里、`source` 那一行**之前**设置即可：
+**shell**
+
+| 按键 / 命令 | 作用 |
+|---|---|
+| `j <关键词>` | 跳到常去的目录 |
+| `Ctrl-R` · `Ctrl-T` · `Alt-C` | fzf 搜历史 · 搜文件 · 跳目录 |
+| `x <压缩包>` | 解压任意格式 |
+| `Esc Esc` | 给上一条命令加 `sudo` |
+
+**管理**
+
+| 命令 | 作用 |
+|---|---|
+| `sakura` | 速查表 |
+| `sakura update` | 拉取最新版并重新安装 |
+| `sakura doctor` | 检查依赖是否齐全 |
+
+## 设置
+
+在 `~/.zshrc` 的 sakura-term 区块**之前**设置即可：
 
 | 变量 | 默认 | 作用 |
 |---|---|---|
+| `SAKURA_MODULES` | 安装时选的 | 例如 `SAKURA_MODULES=(theme tools)` |
+| `SAKURA_SAFE_RM` | `1` | `0` 让 `rm` 恢复原样 |
 | `SAKURA_REMOTE_PROFILE` | `Sakura Glass` | 远程时切到哪个 iTerm2 配置文件 |
-| `SAKURA_LOCAL_PROFILE` | `Mist Sakura` | 切回本地时的后备配置文件（默认切回该标签页原本的配置文件） |
 | `SAKURA_AUTO_SWITCH` | `1` | `0` 关闭远程自动切换 |
 | `SAKURA_P10K_COLORS` | `1` | `0` 保留你自己的 p10k 配色 |
 | `SAKURA_WELCOME` | `1` | `0` 关闭欢迎面板 |
-| `SAKURA_TMUX_HOST` | 空 | `st` 连接的主机，例如 `me@server` |
-| `SAKURA_TMUX_SESSION` | `main` | `st` 默认的 tmux 会话名；`st work` 可指定别的 |
+| `SAKURA_TMUX_HOST` | 空 | `st` 连接的主机 |
+| `SAKURA_TMUX_SESSION` | `main` | `st` 默认会话名 |
 
-例如：
+## 安装脚本做了什么
 
-```zsh
-# >>> sakura-term >>>
-SAKURA_TMUX_HOST="me@my-server"
-SAKURA_WELCOME=0
-[[ -f "$HOME/.config/sakura-term/sakura-term.zsh" ]] && source "$HOME/.config/sakura-term/sakura-term.zsh"
-# <<< sakura-term <<<
-```
+- **shell 模块**：把 oh-my-zsh、powerlevel10k、两个插件 clone 到 `~/.oh-my-zsh`；fzf 装到 `~/.fzf`；zoxide 装到 `~/.local/bin`。缺 zsh/git/curl 时会尝试用 apt/dnf/yum/pacman 安装（需要 sudo）。如果你的 `~/.zshrc` 已经加载了 oh-my-zsh，就不重复加载。
+- 没有 `~/.p10k.zsh` 时，复制 powerlevel10k 自带的 rainbow 配置，并套上 Sakura 的布局。
+- **remote 模块**：从 GitHub Releases 下载 tssh、trz、tsz 到 `~/.local/bin`。
+- **theme 模块（macOS）**：把两个主题放进 iTerm2 的 DynamicProfiles，实时生效，不碰你已有的配置文件。
+- 把 zsh 模块复制到 `~/.config/sakura-term/`，在 `~/.zshrc` 末尾加一个 `# >>> sakura-term >>>` 区块（先备份成 `.zshrc.bak-sakura-term`）。
+
+重复运行是安全的。不会自动改你的登录 shell，如果不是 zsh 会提示你 `chsh` 命令。
 
 ## 自己调颜色
 
-所有颜色都在 [`build.py`](build.py) 顶部。改完运行：
+主题颜色在 [`build.py`](build.py) 顶部，改完运行：
 
 ```bash
 python3 build.py && ./install.sh --themes-only
 ```
 
-`colors/` 里的 `.itermcolors` 也可以单独导入：iTerm2 → Profiles → Colors → Color Presets → Import。
-
-p10k 色块的颜色在 [`zsh/sakura-term.zsh`](zsh/sakura-term.zsh) 第 1 节。
-
-## 小贴士
-
-- 色板里的 "绿色" 槽位被换成了樱粉色，所以 zsh 语法高亮里的命令、`git status` 里的新文件都会是粉色。
-- 浅色主题遵循 light theme 惯例：ANSI 白色（7/15）是深色，避免程序输出 "白字" 时在浅底上看不见。
-- iTerm2 的 tmux 集成窗口用的是名为 `tmux` 的配置文件（Settings → General → tmux）。想让 tmux 窗口也是粉蓝：Profiles → tmux → Colors → Color Presets → 导入 `colors/Sakura Glass.itermcolors`。
+p10k 色块在 [`zsh/modules/theme.zsh`](zsh/modules/theme.zsh) 第 1 节。
 
 ## 卸载
 
 ```bash
-./uninstall.sh
+~/.sakura-term/uninstall.sh
 ```
+
+oh-my-zsh、fzf 等工具会保留，脚本会告诉你它们在哪。
+
+## 致谢
+
+日常与远程命令的思路来自 [GCR](https://github.com/gaojunbin/GCR)（Apache-2.0），这里做了跨平台重写，并去掉了站点专用的功能，详见 [NOTICE](NOTICE)。
 
 ## License
 
-MIT
+[Apache-2.0](LICENSE)
