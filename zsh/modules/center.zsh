@@ -2,7 +2,7 @@
 # A lock-screen style clock and Control Center style tiles, shown once per new tab.
 #   sakura / hud  show it again any time
 #   hud -c        compact one-liner
-# SAKURA_WELCOME=1 full (default) · 2 compact · 0 off
+# SAKURA_WELCOME=1 full (default) · 2 compact · 0 off   (never automatic inside tmux)
 # Colors are ANSI theme colors, so it follows whichever iTerm2 profile is active.
 
 : ${SAKURA_WELCOME:=1}
@@ -265,6 +265,7 @@ hud() {   # not `cc`: that name belongs to the C compiler
 _sakura_welcome() {
   add-zsh-hook -d precmd _sakura_welcome
   [[ -t 1 && -z $SAKURA_WELCOME_SHOWN ]] || return
+  [[ -n $TMUX ]] && return                       # every tmux pane is a new shell: stay quiet, `hud` on demand
   export SAKURA_WELCOME_SHOWN=1
   if (( SAKURA_WELCOME == 2 || ${COLUMNS:-80} < 50 )); then _cc_compact; else _cc_full; fi
 }
