@@ -161,7 +161,12 @@ run() {
   return $rc
 }
 have() { command -v "$1" >/dev/null 2>&1; }
-as_root() { if [[ $EUID -eq 0 ]]; then "$@"; elif have sudo; then sudo "$@"; else return 1; fi; }
+# never prompt for a password: on shared servers we only use sudo if it works without one
+as_root() { if [[ $EUID -eq 0 ]]; then "$@"; elif have sudo && sudo -n true 2>/dev/null; then sudo -n "$@"; else return 1; fi; }
+# zsh built into your home folder (GCR and similar no-sudo setups) counts as installed
+for z in "$HOME/zsh/bin" "$HOME/.local/bin" "$HOME/opt/zsh/bin"; do
+  [[ -x "$z/zsh" ]] && case ":$PATH:" in *":$z:"*) ;; *) export PATH="$z:$PATH" ;; esac
+done
 clone() {  # clone <label> <url> <dir>
   if [[ -d "$3" ]]; then skip "$1"
   else run "$1" "" git clone --depth 1 --quiet "$2" "$3" || true; fi
@@ -301,7 +306,7 @@ if (( DEPS )); then
     }
     run "${missing[*]}" "$(t 已安装 installed)" pm_install "${missing[@]}" || true
     for c in "${missing[@]}"; do
-      have "$c" || { warn "$(t "缺少 $c，且无法自动安装（没有 sudo？）。请先装好它再重新运行。" "$c is missing and could not be installed (no sudo?). Install it, then rerun.")"; echo; exit 1; }
+      have "$c" || { warn "$(t "缺少 $c。安装需要管理员权限（不会替你输入 sudo 密码）：请让管理员装好，或用不需要 sudo 的方式装在自己目录下，然后重新运行。" "$c is missing. Installing it needs admin rights (this script never asks for a sudo password): ask your admin, or install it in your home folder, then rerun.")"; echo; exit 1; }
     done
   fi
 
@@ -397,6 +402,11 @@ fi
 
 touch "$ZSHRC"
 cp "$ZSHRC" "$ZSHRC.bak-dusk"
+# an older welcome banner would show up next to Dusk's Control Center: switch its call off
+if grep -qE '^[[:space:]]*show_terminal_welcome[[:space:]]*$' "$ZSHRC"; then
+  sed -i.tmp -E 's/^([[:space:]]*)show_terminal_welcome[[:space:]]*$/\1# show_terminal_welcome   # replaced by the Dusk Control Center (hud)/' "$ZSHRC" && rm -f "$ZSHRC.tmp"
+  OLD_WELCOME=1
+fi
 awk -v b="$BEGIN" -v e="$END" '$0==b{skip=1} !skip{print} $0==e{skip=0}' "$ZSHRC.bak-dusk" > "$ZSHRC"
 conf_ref="${CONF_DIR/#$HOME/\$HOME}"
 {
@@ -405,13 +415,14 @@ conf_ref="${CONF_DIR/#$HOME/\$HOME}"
   echo "$END"
 } >> "$ZSHRC"
 ok "$(short "$ZSHRC")" "$(t '已接入，备份为 .zshrc.bak-dusk' 'hooked, backup at .zshrc.bak-dusk')"
+[[ -n ${OLD_WELCOME:-} ]] && ok "$(t '旧的欢迎面板' 'old welcome banner')" "$(t '已停用，由控制中心代替' 'switched off, the Control Center replaces it')"
 if [[ -n $TMUX_HOST ]]; then ok "${TMUX_CMD:-tm}" "tmux → $TMUX_HOST"; fi
 
 # ─── 4. done ─────────────────────────────────────────────────────────────────
 if has_mod shell && [[ $OS == Darwin ]] && ! ls "$HOME/Library/Fonts" /Library/Fonts 2>/dev/null | grep -qi nerdfont; then
   NOTES+=("$(t '图标需要 Nerd Font：' 'Icons need a Nerd Font:')|brew install --cask font-jetbrains-mono-nerd-font")
 fi
-if [[ "$(basename "${SHELL:-}")" != zsh ]] && have zsh; then
+if [[ "$(basename "${SHELL:-}")" != zsh ]] && have zsh && ! grep -qs 'exec .*zsh' "$HOME/.bash_profile" "$HOME/.profile" "$HOME/.bashrc"; then
   NOTES+=("$(t '默认 shell 还不是 zsh，切换：' 'Your login shell is not zsh yet:')|chsh -s $(command -v zsh)")
 fi
 
