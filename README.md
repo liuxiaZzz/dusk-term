@@ -55,7 +55,7 @@ GCR 更新只会覆盖它自己的文件，dusk 放在 `~/.config/dusk`，互不
 ~/.dusk/install.sh --modules theme,tools      # 只要主题和日常命令
 ~/.dusk/install.sh --no-deps                  # 不下载任何依赖（服务器离线时）
 ~/.dusk/install.sh --themes-only              # 只装 iTerm2 主题
-~/.dusk/install.sh --tmux-host me@server      # 一键进服务器 tmux（命令默认叫 st）
+~/.dusk/install.sh --tmux-host me@server      # 一键进服务器 tmux（命令默认叫 tm）
 ```
 
 | 模块 | 内容 |
@@ -125,7 +125,7 @@ GCR 更新只会覆盖它自己的文件，dusk 放在 `~/.config/dusk`，互不
 | `upload` · `download [文件]` | 在服务器上运行，弹出本地文件框上传 / 下载到本地 |
 | `dps` · `dsh <容器>` · `dlog <容器>` | docker ps / 进容器 / 看日志 |
 | `dockeradd [用户]` | Linux 上免 sudo 使用 docker |
-| `st` | 列出所有服务器上的 tmux 会话（窗口数、是否已连接、最近活动），选一个进入或新建。`st 名字` 直接进默认服务器上的会话，`st 服务器 名字` 进指定服务器，`st 服务器` 可以是 `~/.ssh/config` 里的任何一台。列表最后的「其他服务器…」能从 `~/.ssh/config` 里挑一台新开，并顺手加入常用列表。服务器、命令名、配色用 `dusk tmux` 设置 |
+| `tm` | 列出所有服务器上的 tmux 会话（窗口数、是否已连接、最近活动），选一个进入或新建。`tm 名字` 直接进默认服务器上的会话，`tm 服务器 名字` 进指定服务器，`tm 服务器` 可以是 `~/.ssh/config` 里的任何一台。列表最后的「其他服务器…」能从 `~/.ssh/config` 里挑一台新开，并顺手加入常用列表。服务器、命令名、配色用 `dusk tmux` 设置 |
 
 **shell**
 
@@ -153,8 +153,8 @@ GCR 更新只会覆盖它自己的文件，dusk 放在 `~/.config/dusk`，互不
 ```bash
 dusk theme                 # 菜单里选风格和本机/远程配色，当前标签页立即生效
 dusk theme glass split     # 或者直接说：classic|glass  split|dark|light
-dusk tmux                  # 设置一键进 tmux：服务器、默认会话、命令名（st / jt …）、窗口配色
-dusk tmux me@a me@b --cmd jt   # 或者直接说：可以多台服务器，第一台是默认
+dusk tmux                  # 设置一键进 tmux：服务器、默认会话、命令名（默认 tm）、窗口配色
+dusk tmux me@a me@b --cmd tm   # 或者直接说：可以多台服务器，第一台是默认
 dusk tmux off              # 关掉
 ```
 

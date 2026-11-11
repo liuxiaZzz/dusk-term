@@ -230,7 +230,7 @@ if (( WANT_THEME )); then
       IFS= read -r ans </dev/tty || ans=""
       [[ -n $ans ]] && TMUX_HOST=$ans
       if [[ -n $TMUX_HOST ]]; then
-        printf '     %s❯%s %s' "$PINK" "$N" "$(t "命令叫什么 [${TMUX_CMD:-st}]：" "Command name [${TMUX_CMD:-st}]: ")"
+        printf '     %s❯%s %s' "$PINK" "$N" "$(t "命令叫什么 [${TMUX_CMD:-tm}]：" "Command name [${TMUX_CMD:-tm}]: ")"
         IFS= read -r ans </dev/tty || ans=""
         [[ -n $ans ]] && TMUX_CMD=$ans
       fi
@@ -404,7 +404,7 @@ conf_ref="${CONF_DIR/#$HOME/\$HOME}"
   echo "$END"
 } >> "$ZSHRC"
 ok "$(short "$ZSHRC")" "$(t '已接入，备份为 .zshrc.bak-dusk' 'hooked, backup at .zshrc.bak-dusk')"
-if [[ -n $TMUX_HOST ]]; then ok "${TMUX_CMD:-st}" "tmux → $TMUX_HOST"; fi
+if [[ -n $TMUX_HOST ]]; then ok "${TMUX_CMD:-tm}" "tmux → $TMUX_HOST"; fi
 
 # ─── 4. done ─────────────────────────────────────────────────────────────────
 if has_mod shell && [[ $OS == Darwin ]] && ! ls "$HOME/Library/Fonts" /Library/Fonts 2>/dev/null | grep -qi nerdfont; then

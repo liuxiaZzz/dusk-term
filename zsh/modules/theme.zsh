@@ -1,4 +1,4 @@
-# modules/theme.zsh — blue/pink colors, iTerm2 profile switching, `st`
+# modules/theme.zsh — blue/pink colors, iTerm2 profile switching, `tm` (tmux)
 # Part of Dusk: https://github.com/liuxiaZzz/dusk-term
 # Settings can be overridden in ~/.zshrc before the dusk source line.
 
@@ -11,7 +11,7 @@
 : ${DUSK_TMUX_HOSTS:=}            # all hosts the tmux picker looks at (space separated); default: DUSK_TMUX_HOST
 : ${DUSK_BADGE:=1}                # 1 = small hostname watermark while on a server
 : ${DUSK_TMUX_SESSION:=main}      # default tmux session
-: ${DUSK_TMUX_CMD:=st}            # name of the tmux command (st, jt, ...)
+: ${DUSK_TMUX_CMD:=tm}            # name of the tmux command (default tm)
 : ${DUSK_TMUX_PROFILE:=}          # iTerm2 profile for tmux windows; empty = the remote profile
 
 # style + mode → which iTerm2 profile is used where (recomputed by `dusk theme`)
@@ -129,10 +129,10 @@ elif [[ -n $SSH_CONNECTION ]] && (( DUSK_BADGE )); then
 fi
 
 # ─── 3. tmux on servers in one command (iTerm2 tmux integration) ────────────
-#   jt               pick from the tmux sessions on all your servers, or start a new one
-#   jt work          session "work" on the default server
-#   jt host work     session "work" on that server
-#   jt host          session $DUSK_TMUX_SESSION on any host from ~/.ssh/config
+#   tm               pick from the tmux sessions on all your servers, or start a new one
+#   tm work          session "work" on the default server
+#   tm host work     session "work" on that server
+#   tm host          session $DUSK_TMUX_SESSION on any host from ~/.ssh/config
 # The command name is $DUSK_TMUX_CMD (set with `dusk tmux`). Windows open in a NEW iTerm2
 # window that already uses the right profile, so the tmux windows inherit it.
 _dusk_tmux_hosts() { reply=(${=DUSK_TMUX_HOSTS:-$DUSK_TMUX_HOST}) }
