@@ -13,6 +13,7 @@ import io
 import json
 import math
 import os
+import re
 import sys
 import threading
 import urllib.parse
@@ -29,8 +30,22 @@ try:
     from openslide.deepzoom import DeepZoomGenerator
 except Exception:                          # missing module or missing C library
     openslide = None
+try:                                       # pyramidal TIFF / OME-TIFF (pyramid in SubIFDs, which
+    import numpy                           # OpenSlide does not read)
+    import tifffile
+    import zarr
+    # Import lazily-loaded helpers now, in the main thread. Otherwise the first request thread
+    # imports them, and some (fsspec → an unrelated "snappy" package) install signal handlers,
+    # which Python only allows in the main thread.
+    for _m in ("imagecodecs", "numcodecs", "fsspec", "zarr.storage"):
+        try:
+            __import__(_m)
+        except Exception:
+            pass
+except Exception:
+    tifffile = zarr = None
 
-WSI_EXT = {".svs", ".ndpi", ".mrxs", ".scn", ".vms", ".vmu", ".bif", ".svslide", ".tif", ".tiff", ".dcm"}
+WSI_EXT = {".svs", ".ndpi", ".mrxs", ".scn", ".vms", ".vmu", ".bif", ".svslide", ".tif", ".tiff", ".dcm", ".btf", ".tf2", ".tf8"}
 IMG_EXT = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff"}
 TILE, OVERLAP, QUALITY = 254, 2, 82
 
@@ -41,6 +56,8 @@ class PilSource:
 
     def __init__(self, path):
         img = Image.open(path)
+        if img.size[0] * img.size[1] > 500_000_000:          # would need GBs of RAM and minutes
+            raise RuntimeError(f"{img.size[0]}×{img.size[1]} 太大，又不是金字塔格式，无法流畅浏览")
         img.load()
         self.full = img.convert("RGB")
         self.width, self.height = self.full.size
@@ -85,6 +102,9 @@ class SlideSource:
 
     def __init__(self, path):
         self.slide = openslide.OpenSlide(path)
+        w, h = self.slide.dimensions
+        if self.slide.level_count == 1 and max(w, h) > 20000:
+            raise RuntimeError(f"{w}×{h} 但 OpenSlide 只看到 1 层（没有金字塔），这样缩放会极慢")
         self.dz = DeepZoomGenerator(self.slide, tile_size=TILE, overlap=OVERLAP, limit_bounds=True)
         self.width, self.height = self.dz.level_dimensions[-1]
         self.max_level = self.dz.level_count - 1
@@ -103,28 +123,166 @@ class SlideSource:
         return self.slide.get_thumbnail((size, size)).convert("RGB")
 
 
+# Older tifffile/zarr combinations hang when several threads open or read TIFFs at once, so all
+# TIFF work goes through one lock. Each read is a few ms; opening a file takes ~1 s once.
+TIFF_LOCK = threading.RLock()
+
+
+class TiffPyramidSource:
+    """Pyramidal TIFF / OME-TIFF read with tifffile + zarr: each deep-zoom tile is cut from the
+    pyramid level closest to the requested scale, so only a few compressed tiles are decoded."""
+
+    def __init__(self, path):
+        with TIFF_LOCK:
+            self._init(path)
+
+    def _init(self, path):
+        self.lock = TIFF_LOCK
+        self.tif = tifffile.TiffFile(path)
+        series = self.tif.series[0]
+        axes = series.axes
+        if "Y" not in axes or "X" not in axes:
+            raise RuntimeError(f"unsupported axes {axes}")
+        self.axes = axes
+        store = series.aszarr()
+        z = zarr.open(store, mode="r")
+        self.levels = [z[str(i)] for i in range(len(series.levels))] if len(series.levels) > 1 else [z]
+        shape0 = series.levels[0].shape
+        self.height, self.width = shape0[axes.index("Y")], shape0[axes.index("X")]
+        self.downs = [self.width / lv.shape[axes.index("X")] for lv in series.levels]
+        self.max_level = max(0, math.ceil(math.log2(max(self.width, self.height))))
+        self.props = {"format": "OME-TIFF" if self.tif.is_ome else "TIFF",
+                      "levels": len(series.levels)}
+        if self.tif.is_ome and self.tif.ome_metadata:
+            om = self.tif.ome_metadata
+            m = re.search(r'PhysicalSizeX="([^"]+)"', om)
+            unit = re.search(r'PhysicalSizeXUnit="([^"]+)"', om)
+            if m:
+                v = float(m.group(1)); u = unit.group(1) if unit else "µm"
+                v = v * {"nm": 1e-3, "mm": 1e3, "m": 1e6}.get(u, 1)
+                self.props["mpp_x"] = f"{v:.6g}"
+            mag = re.search(r'NominalMagnification="([^"]+)"', om)
+            if mag:
+                self.props["objective"] = mag.group(1)
+
+    def _read(self, k, x0, y0, x1, y1):
+        """Region [x0,x1)×[y0,y1) of pyramid level k as an RGB PIL image."""
+        with self.lock:
+            return self._read_unlocked(k, x0, y0, x1, y1)
+
+    def _read_unlocked(self, k, x0, y0, x1, y1):
+        idx = []
+        for ax in self.axes:
+            if ax == "Y": idx.append(slice(y0, y1))
+            elif ax == "X": idx.append(slice(x0, x1))
+            elif ax in "SC": idx.append(slice(None))
+            else: idx.append(0)                      # T, Z, ...: first plane
+        a = self.levels[k][tuple(idx)]
+        keep = [ax for ax in self.axes if ax in "YXSC"]
+        np = numpy
+        a = np.asarray(a)
+        order = [keep.index("Y"), keep.index("X")] + [i for i, ax in enumerate(keep) if ax in "SC"]
+        a = a.transpose(order)
+        if a.dtype != np.uint8:                      # e.g. 16-bit: stretch to 8-bit
+            hi = float(a.max()) or 1.0
+            a = (a.astype(np.float32) * (255.0 / hi)).astype(np.uint8)
+        if a.ndim == 2:
+            return Image.fromarray(a).convert("RGB")
+        ch = a.shape[2]
+        if ch == 1:
+            return Image.fromarray(a[:, :, 0]).convert("RGB")
+        if ch >= 3:
+            return Image.fromarray(np.ascontiguousarray(a[:, :, :3]))
+        return Image.fromarray(np.ascontiguousarray(a[:, :, 0])).convert("RGB")
+
+    def level_size(self, level):
+        s = 2 ** (self.max_level - level)
+        return max(1, math.ceil(self.width / s)), max(1, math.ceil(self.height / s))
+
+    def tile(self, level, col, row):
+        w, h = self.level_size(level)
+        x0, y0 = col * TILE - (OVERLAP if col else 0), row * TILE - (OVERLAP if row else 0)
+        x1, y1 = min((col + 1) * TILE + OVERLAP, w), min((row + 1) * TILE + OVERLAP, h)
+        if x0 >= w or y0 >= h:
+            return None
+        ds = 2 ** (self.max_level - level)                       # full-res pixels per tile pixel
+        k = max(i for i, d in enumerate(self.downs) if d <= ds * 1.0001) if any(d <= ds * 1.0001 for d in self.downs) else 0
+        d = self.downs[k]
+        lw = self.levels[k].shape[self.axes.index("X")]
+        lh = self.levels[k].shape[self.axes.index("Y")]
+        fx0, fy0 = int(x0 * ds / d), int(y0 * ds / d)
+        fx1, fy1 = min(lw, math.ceil(x1 * ds / d)), min(lh, math.ceil(y1 * ds / d))
+        if fx1 <= fx0 or fy1 <= fy0:
+            return None
+        img = self._read(k, fx0, fy0, fx1, fy1)
+        size = (x1 - x0, y1 - y0)
+        return img if img.size == size else img.resize(size, Image.BILINEAR)
+
+    def thumbnail(self, size):
+        k = len(self.levels) - 1
+        lw = self.levels[k].shape[self.axes.index("X")]; lh = self.levels[k].shape[self.axes.index("Y")]
+        img = self._read(k, 0, 0, lw, lh)
+        img.thumbnail((size, size))
+        return img
+
+
+_pyramid_cache, _pyramid_lock = {}, threading.Lock()
+
+
+def is_pyramid_tiff(path):
+    if not tifffile:
+        return False
+    with _pyramid_lock:
+        if path in _pyramid_cache:
+            return _pyramid_cache[path]
+    try:
+        with TIFF_LOCK, tifffile.TiffFile(path) as t:
+            s = t.series[0]
+            r = len(s.levels) > 1 or t.is_ome or t.pages[0].is_tiled
+    except Exception:
+        r = False
+    with _pyramid_lock:
+        _pyramid_cache[path] = r
+    return r
+
+
 class Sources:
     """Keeps a few recently used images open."""
 
     def __init__(self, keep=6):
         self.cache, self.keep, self.lock = OrderedDict(), keep, threading.Lock()
+        self.opening = {}
 
     def get(self, path):
         with self.lock:
             if path in self.cache:
                 self.cache.move_to_end(path)
                 return self.cache[path]
-        src = open_source(path)
+            opening = self.opening.setdefault(path, threading.Lock())
+        with opening:                              # first request opens it, others wait for that
+            with self.lock:
+                if path in self.cache:
+                    return self.cache[path]
+            src = open_source(path)
         with self.lock:
+            self.opening.pop(path, None)
             self.cache[path] = src
             while len(self.cache) > self.keep:
                 self.cache.popitem(last=False)
         return src
 
 
+TIFF_EXT = {".tif", ".tiff", ".btf", ".tf2", ".tf8"}
+
+
 def open_source(path):
     ext = os.path.splitext(path)[1].lower()
     errors = []
+    if ext in TIFF_EXT and is_pyramid_tiff(path):
+        try:
+            return TiffPyramidSource(path)
+        except Exception as e:
+            errors.append(f"tifffile: {type(e).__name__}: {e}")
     if openslide and ext in WSI_EXT:
         try:
             return SlideSource(path)
@@ -142,7 +300,7 @@ def open_source(path):
 
 def kind(name):
     ext = os.path.splitext(name)[1].lower()
-    if ext in WSI_EXT - IMG_EXT:
+    if ext in WSI_EXT - IMG_EXT or name.lower().endswith((".ome.tif", ".ome.tiff")):
         return "slide"
     return "image" if ext in IMG_EXT else None
 
@@ -197,13 +355,17 @@ class App:
                 return self.thumbs[key]
         full = self.resolve(rel)
         ext = os.path.splitext(full)[1].lower()
-        if openslide and ext in WSI_EXT:
+        img = None
+        if ext in TIFF_EXT and is_pyramid_tiff(full):
             try:
-                img = openslide.OpenSlide(full).get_thumbnail((size, size)).convert("RGB")
+                img = self.sources.get(full).thumbnail(size)
             except Exception:
                 img = None
-        else:
-            img = None
+        if img is None and openslide and ext in WSI_EXT:
+            try:
+                img = self.sources.get(full).thumbnail(size)     # SlideSource guards huge flat files
+            except Exception:
+                img = None
         if img is None:
             with Image.open(full) as im:
                 im.draft("RGB", (size, size))               # fast path for JPEG
@@ -397,7 +559,8 @@ async function openImage(name) {
   const pr = info.props || {};
   mpp = pr.mpp_x ? parseFloat(pr.mpp_x) : null;
   $("dims").textContent = `${info.width.toLocaleString()} × ${info.height.toLocaleString()} px` +
-    (pr.objective ? ` · ${pr.objective}×` : "") + (mpp ? ` · ${mpp.toFixed(3)} µm/px` : "") + (pr.vendor ? ` · ${pr.vendor}` : "");
+    (pr.objective ? ` · ${pr.objective}×` : "") + (mpp ? ` · ${mpp.toFixed(3)} µm/px` : "") + (pr.vendor ? ` · ${pr.vendor}` : "") +
+    (pr.format && pr.format !== "PNG" && pr.format !== "JPEG" ? ` · ${pr.format}${pr.levels ? " " + pr.levels + " 层" : ""}` : "");
   const source = { width: info.width, height: info.height, tileSize: info.tileSize, tileOverlap: info.overlap,
     minLevel: 0, maxLevel: info.maxLevel, getTileUrl: (l, x, y) => `/api/tile?p=${enc(p)}&l=${l}&x=${x}&y=${y}` };
   if (!osd) {
@@ -465,10 +628,10 @@ def main():
     except OSError as e:
         print(f"DUSK_VIEW_ERROR 端口 {a.port} 用不了：{e}", flush=True)
         sys.exit(4)
-    note = "" if openslide else " (no openslide: whole-slide formats need it)"
+    note = "" if (openslide or tifffile) else " (no openslide/tifffile: whole-slide formats need them)"
     threading.Thread(target=watchdog, daemon=True).start()
     print(f"DUSK_VIEW_READY {a.port}{note}", flush=True)
-    if not openslide:
+    if not openslide and not tifffile:
         print("DUSK_VIEW_NO_OPENSLIDE", flush=True)
     try:
         srv.serve_forever()

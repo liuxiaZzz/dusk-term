@@ -86,7 +86,9 @@ fi
 
 # shell snippet that sets $PY to a Python with Pillow (preferring one that also has openslide)
 _dk_view_pick_py() {
-  REPLY='PY=$DVP; if [ -z "$PY" ]; then for p in "$HOME/miniconda3/bin/python3" "$HOME/anaconda3/bin/python3" "$HOME/miniforge3/bin/python3" "$HOME/mambaforge/bin/python3" "$(command -v python3)"; do [ -x "$p" ] || continue; [ -z "$FIRST" ] && FIRST=$p; if "$p" -c "import PIL, openslide" 2>/dev/null; then PY=$p; break; fi; [ -z "$PILPY" ] && "$p" -c "import PIL" 2>/dev/null && PILPY=$p; done; PY=${PY:-${PILPY:-$FIRST}}; fi; [ -n "$PY" ] || { echo "DUSK_VIEW_ERROR 找不到 python3"; exit 2; }'
+  # score each candidate: Pillow is required; tifffile+zarr (OME-TIFF pyramids) and openslide
+  # (.svs/.ndpi/...) add points. conda envs are included, so an existing env is reused.
+  REPLY='PY=$DVP; if [ -z "$PY" ]; then best=-1; for p in "$HOME"/miniconda3/envs/*/bin/python "$HOME"/anaconda3/envs/*/bin/python "$HOME"/miniforge3/envs/*/bin/python "$HOME"/mambaforge/envs/*/bin/python "$HOME/miniconda3/bin/python3" "$HOME/anaconda3/bin/python3" "$HOME/miniforge3/bin/python3" "$HOME/mambaforge/bin/python3" "$(command -v python3)"; do [ -x "$p" ] || continue; sc=$("$p" -c "import importlib.util as u; f=u.find_spec; print((f(\"PIL\") is not None) * (1 + 4*(f(\"tifffile\") is not None and f(\"zarr\") is not None and f(\"numpy\") is not None) + 2*(f(\"openslide\") is not None)))" 2>/dev/null) || continue; [ "$sc" -gt "$best" ] && { best=$sc; PY=$p; }; [ "$sc" -ge 7 ] && break; done; fi; [ -n "$PY" ] || { echo "DUSK_VIEW_ERROR 找不到 python3"; exit 2; }'
 }
 
 _dk_free_port() {
@@ -103,7 +105,7 @@ _dk_free_port() {
 _dk_peek_setup() {   # _dk_peek_setup [host]
   local host=$1; _dk_view_pick_py
   local cmd="DVP=${(qq)DUSK_VIEW_PYTHON}; $REPLY; echo \"→ \$PY\"; \"\$PY\" -m pip install --user --upgrade pillow openslide-python openslide-bin"
-  _dk_pink "  安装看图需要的 Python 包（pillow、openslide）到 ${host:-本机}，只装在你的用户目录"
+  _dk_pink "  安装看图需要的 Python 包（pillow、openslide、tifffile）到 ${host:-本机}，只装在你的用户目录"
   if [[ -n $host ]]; then command ssh -o ClearAllForwardings=yes "$host" "$cmd"
   else sh -c "$cmd"; fi
 }

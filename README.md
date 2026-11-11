@@ -104,8 +104,8 @@ peek ~/Pictures                     # 本机的图片也行
 ```
 
 - 滚轮缩放、拖动平移，右下角小地图；← / → 上一张 / 下一张，Esc 回文件夹，`0` 适应窗口，`f` 全屏
-- 支持 .svs .ndpi .mrxs .scn 等切片（显示物镜倍数、µm/px 和比例尺），以及 png / jpg / tif 等普通大图
-- 服务器只需要 Python 和三个包：pillow、openslide-python、openslide-bin。第一次缺的话会问你要不要装（`pip --user`，只装在你的用户目录）；也可以 `peek --setup 服务器` 手动装
+- 支持 OME-TIFF 和金字塔 TIFF（直接读里面的多分辨率层）、.svs .ndpi .mrxs .scn 等切片（显示 µm/px、比例尺和物镜倍数），以及 png / jpg / tif 等普通大图
+- 服务器只需要 Python 和几个包：pillow，OME-TIFF 需要 tifffile + zarr + imagecodecs，.svs 等需要 openslide。会自动在你已有的 conda 环境里挑一个装得最全的；都没有就问你要不要装（`pip --user`，只装在你的用户目录），也可以 `peek --setup 服务器` 手动装
 - 服务器上不需要装 Dusk：看图程序通过 ssh 临时传过去运行，只监听服务器本机，经 ssh 隧道到你的电脑；按 Ctrl-C 一起关掉（3 小时没人看也会自己退出）
 - 服务器负责切 256 像素的小瓦片（每块几毫秒，只用 CPU），只传你屏幕上看得到的部分，所以几 GB 的切片也不卡
 
