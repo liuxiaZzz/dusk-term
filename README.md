@@ -19,6 +19,19 @@ macOS 上再做一步：iTerm2 → **Settings → Profiles** → 选 **Mist Saku
 
 > 建议 clone 到 `~/.sakura-term`，以后 `sakura update` 就能一键更新。
 
+### 本机和服务器
+
+同一条命令在两边都能用，脚本会自动判断角色：
+
+| | 本机（macOS） | 服务器（Linux） |
+|---|---|---|
+| iTerm2 主题、远程自动切主题、`st` | ✓ | – |
+| p10k 蓝粉配色、欢迎面板 | ✓ | ✓ |
+| shell 环境、日常命令、`listen`、docker 辅助 | ✓ | ✓ |
+| 传文件 | `tssh`（拖拽上传） | `trz` / `tsz`、`upload` / `download` |
+
+需要时可以手动指定：`--role local` 或 `--role server`。
+
 ### 只装一部分
 
 四个模块可以自由组合：
@@ -76,7 +89,7 @@ macOS 上再做一步：iTerm2 → **Settings → Profiles** → 选 **Mist Saku
 |---|---|
 | `listen` | 交互式 SSH 端口转发；也可以直接 `listen L 服务器 8888`（本机访问服务器的 8888） |
 | `listen R 服务器 3000` · `listen D 服务器 1080` | 远程转发 · socks5 代理 |
-| `tssh 服务器` | 带拖拽上传的 ssh（trzsz） |
+| `tssh 服务器` | 带拖拽上传的 ssh（本机；服务器上装了 sakura-term 就有 trz） |
 | `upload` · `download [文件]` | 在服务器上运行，弹出本地文件框上传 / 下载到本地 |
 | `dps` · `dsh <容器>` · `dlog <容器>` | docker ps / 进容器 / 看日志 |
 | `dockeradd [用户]` | Linux 上免 sudo 使用 docker |
@@ -118,7 +131,7 @@ macOS 上再做一步：iTerm2 → **Settings → Profiles** → 选 **Mist Saku
 
 - **shell 模块**：把 oh-my-zsh、powerlevel10k、两个插件 clone 到 `~/.oh-my-zsh`；fzf 装到 `~/.fzf`；zoxide 装到 `~/.local/bin`。缺 zsh/git/curl 时会尝试用 apt/dnf/yum/pacman 安装（需要 sudo）。如果你的 `~/.zshrc` 已经加载了 oh-my-zsh，就不重复加载。
 - 没有 `~/.p10k.zsh` 时，复制 powerlevel10k 自带的 rainbow 配置，并套上 Sakura 的布局。
-- **remote 模块**：从 GitHub Releases 下载 tssh、trz、tsz 到 `~/.local/bin`。
+- **remote 模块**：从 GitHub Releases 下载到 `~/.local/bin`：本机下载 tssh，服务器下载 trz / tsz。
 - **theme 模块（macOS）**：把两个主题放进 iTerm2 的 DynamicProfiles，实时生效，不碰你已有的配置文件。
 - 把 zsh 模块复制到 `~/.config/sakura-term/`，在 `~/.zshrc` 末尾加一个 `# >>> sakura-term >>>` 区块（先备份成 `.zshrc.bak-sakura-term`）。
 

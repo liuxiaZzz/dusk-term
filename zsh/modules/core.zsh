@@ -7,9 +7,9 @@ _sk_ask()   { local r; read -r "r?$1 [y/N] "; [[ $r == [yY]* ]] }
 
 _sakura_help() {
   _sk_pink "✻ Sakura Term"
-  _sk_dim  "  modules: ${SAKURA_MODULES[*]}"
+  _sk_dim  "  ${SAKURA_ROLE:-local} · modules: ${SAKURA_MODULES[*]}"
   print
-  if (( ${SAKURA_MODULES[(Ie)theme]} )); then
+  if (( ${SAKURA_MODULES[(Ie)theme]} )) && [[ ${SAKURA_ROLE:-local} == local ]]; then
     _sk_blue "  theme"
     print "    ssh / tssh / mosh  远程时自动切换到 ${SAKURA_REMOTE_PROFILE:-Sakura Glass}（iTerm2）"
     [[ -n $SAKURA_TMUX_HOST ]] && print "    st [会话名]        连接 $SAKURA_TMUX_HOST 上的 tmux（iTerm2 -CC）"
@@ -29,7 +29,11 @@ _sakura_help() {
   if (( ${SAKURA_MODULES[(Ie)remote]} )); then
     _sk_blue "  remote"
     print "    listen             SSH 端口转发（L 本地 / R 远程 / D socks5），可交互"
-    print "    upload [-d]        上传文件（trz，在服务器上运行）   download [文件]  下载（tsz）"
+    if [[ ${SAKURA_ROLE:-local} == server ]]; then
+      print "    upload [-d]        从本机上传文件（trz）   download [文件]  下载到本机（tsz）"
+    else
+      print "    tssh <主机>        带拖拽上传的 ssh（服务器端需要 trz，装 sakura-term 即有）"
+    fi
     print "    dps  dsh <容器>  dlog <容器>  dockeradd [用户]      docker 辅助"
   fi
   if (( ${SAKURA_MODULES[(Ie)shell]} )); then

@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Sakura Term installer — macOS + Linux
 #
-#   ./install.sh                              everything: shell, theme, tools, remote
+#   ./install.sh                              everything; role is detected automatically:
+#                                               macOS → local (iTerm2 themes, tssh client)
+#                                               Linux → server (trz/tsz for file transfer)
+#   ./install.sh --role local|server          override the detected role
 #   ./install.sh --modules theme,tools        pick modules (shell, theme, tools, remote)
 #   ./install.sh --tmux-host me@server        enable `st` (tmux on that host via iTerm2)
 #   ./install.sh --no-deps                    don't download anything (oh-my-zsh, fzf, ...)
@@ -21,6 +24,7 @@ BEGIN="# >>> sakura-term >>>"
 END="# <<< sakura-term <<<"
 
 MODULES="shell,theme,tools,remote"
+ROLE=""
 TMUX_HOST=""
 DEPS=1
 THEMES_ONLY=0
@@ -28,14 +32,17 @@ ARGS=("$@")
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --modules)     MODULES="${2:?--modules needs a list, e.g. theme,tools}"; shift 2 ;;
+    --role)        ROLE="${2:?--role needs local or server}"; shift 2 ;;
     --tmux-host)   TMUX_HOST="${2:?--tmux-host needs a value, e.g. me@server}"; shift 2 ;;
     --no-deps)     DEPS=0; shift ;;
     --themes-only) THEMES_ONLY=1; shift ;;
-    -h|--help)     sed -n '2,10p' "$0"; exit 0 ;;
+    -h|--help)     sed -n '2,14p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
 done
 has_mod() { [[ ",$MODULES," == *",$1,"* ]]; }
+[[ -n $ROLE ]] || ROLE=$([[ $OS == Darwin ]] && echo local || echo server)
+[[ $ROLE == local || $ROLE == server ]] || { echo "--role must be local or server" >&2; exit 1; }
 for m in ${MODULES//,/ }; do
   [[ $m =~ ^(shell|theme|tools|remote)$ ]] || { echo "unknown module: $m (use shell, theme, tools, remote)" >&2; exit 1; }
 done
@@ -50,10 +57,10 @@ clone() {  # clone <url> <dir>  (shallow, skipped if present)
 }
 as_root() { if [[ $EUID -eq 0 ]]; then "$@"; elif have sudo; then sudo "$@"; else return 1; fi; }
 
-pink "✻ Sakura Term  ($OS · modules: $MODULES)"
+pink "✻ Sakura Term  ($OS · $ROLE · modules: $MODULES)"
 
 # ─── 1. iTerm2 profiles (macOS) ──────────────────────────────────────────────
-if [[ $OS == Darwin ]] && { has_mod theme || (( THEMES_ONLY )); }; then
+if [[ $OS == Darwin && $ROLE == local ]] && { has_mod theme || (( THEMES_ONLY )); }; then
   mkdir -p "$ITERM_DIR"
   cp "$REPO_DIR/iterm/sakura-term.json" "$ITERM_DIR/sakura-term.json"
   ok "iTerm2 profiles: Mist Sakura (light), Sakura Glass (dark)"
@@ -72,7 +79,7 @@ if (( DEPS )); then
   missing=(); for c in zsh git curl; do have "$c" || missing+=("$c"); done
   if (( ${#missing[@]} )); then
     echo "  installing: ${missing[*]}"
-    if   have apt-get; then as_root apt-get update -qq && as_root apt-get install -y -qq "${missing[@]}"
+    if   have apt-get; then { as_root apt-get update -qq && DEBIAN_FRONTEND=noninteractive as_root apt-get install -y -qq "${missing[@]}"; } >/dev/null
     elif have dnf;     then as_root dnf install -y -q "${missing[@]}"
     elif have yum;     then as_root yum install -y -q "${missing[@]}"
     elif have pacman;  then as_root pacman -S --noconfirm "${missing[@]}"
@@ -108,7 +115,8 @@ if (( DEPS )); then
     fi
   fi
 
-  if has_mod remote && { ! have tssh || ! have trz; }; then
+  # local machine needs the tssh client (drag & drop); servers need trz/tsz
+  if has_mod remote && { { [[ $ROLE == local ]] && ! have tssh; } || { [[ $ROLE == server ]] && ! have trz; }; }; then
     case "$(uname -m)" in x86_64|amd64) arch=x86_64 ;; arm64|aarch64) arch=aarch64 ;; *) arch="" ;; esac
     os=$([[ $OS == Darwin ]] && echo macos || echo linux)
     fetch_release() {  # fetch_release <owner/repo> <asset-prefix>
@@ -120,8 +128,11 @@ if (( DEPS )); then
       rm -rf "$tmp"
     }
     if [[ -n $arch ]]; then
-      have tssh || { fetch_release trzsz/trzsz-ssh tssh && ok "tssh → $BIN" || warn "tssh download failed"; }
-      have trz  || { fetch_release trzsz/trzsz-go trzsz && ok "trz / tsz → $BIN" || warn "trzsz download failed"; }
+      if [[ $ROLE == local ]]; then
+        fetch_release trzsz/trzsz-ssh tssh && ok "tssh → $BIN" || warn "tssh download failed"
+      else
+        fetch_release trzsz/trzsz-go trzsz && ok "trz / tsz → $BIN" || warn "trzsz download failed"
+      fi
     else warn "no trzsz build for $(uname -m); skipped"; fi
   fi
 fi
@@ -136,6 +147,7 @@ fi
 {
   echo "# written by install.sh — rerun it (or \`sakura update\`) instead of editing"
   echo "typeset -ga SAKURA_MODULES=(${MODULES//,/ })"
+  echo "typeset -g  SAKURA_ROLE=$ROLE"
   echo "typeset -g  SAKURA_REPO=\"$REPO_DIR\""
   printf 'typeset -g  SAKURA_INSTALL_ARGS=%q\n' "${ARGS[*]-}"
   echo "typeset -g  SAKURA_P10K_LAYOUT=$P10K_LAYOUT"
@@ -164,6 +176,6 @@ if [[ "$(basename "${SHELL:-}")" != zsh ]] && have zsh; then
 fi
 echo
 pink "Done. Open a new terminal (or run: exec zsh), then type  sakura  for the cheat sheet."
-if [[ $OS == Darwin ]] && has_mod theme; then
+if [[ $OS == Darwin && $ROLE == local ]] && has_mod theme; then
   echo "  iTerm2 → Settings → Profiles → Mist Sakura → Other Actions… → Set as Default"
 fi
