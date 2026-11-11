@@ -42,7 +42,7 @@ _sakura_help() {
     print "    x <压缩包>          解压任意格式               Esc Esc  给上一条命令加 sudo"
   fi
   print
-  _sk_dim "  sakura update   更新    sakura doctor   检查依赖    sakura help   本帮助"
+  _sk_dim "  sakura / hud  控制中心    sakura help  本帮助    sakura update  更新    sakura doctor  检查依赖"
 }
 
 _sakura_update() {
@@ -68,7 +68,8 @@ sakura() {
   case $1 in
     update) _sakura_update ;;
     doctor) _sakura_doctor ;;
-    ""|help|-h|--help) _sakura_help ;;
+    "") hud ;;
+    help|-h|--help) _sakura_help ;;
     *) print "未知命令：$1"; _sakura_help; return 1 ;;
   esac
 }

@@ -46,7 +46,7 @@ macOS 上再做一步：iTerm2 → **Settings → Profiles** → 选 **Mist Saku
 | 模块 | 内容 |
 |---|---|
 | `shell` | oh-my-zsh + powerlevel10k + 自动补全建议 + 语法高亮，fzf，zoxide（`j` 跳目录） |
-| `theme` | 两个 iTerm2 主题、p10k 蓝粉配色、远程自动切主题、欢迎面板、`st` |
+| `theme` | 两个 iTerm2 主题、p10k 蓝粉配色、远程自动切主题、`st` |
 | `tools` | 回收站式 `rm`、git 缩写、磁盘/进程/端口/权限等小工具 |
 | `remote` | SSH 端口转发 `listen`、trzsz 拖拽传文件、docker 辅助 |
 
@@ -60,6 +60,17 @@ macOS 上再做一步：iTerm2 → **Settings → Profiles** → 选 **Mist Saku
 - 敲 `ssh` / `tssh` / `mosh` 时窗口自动切成 Sakura Glass，退出后切回原来的主题（iTerm2）。
 - p10k 提示栏是六种低饱和蓝粉色块，Linux 上只要终端支持真彩色也一样。
 - 色板里的"绿色"槽位换成了樱粉，所以命令高亮、`git status` 新文件都是粉色。
+
+## 控制中心
+
+新标签页会显示一个仿 iOS / macOS 的控制中心，也可以随时输入 `hud`（或 `sakura`）打开：
+
+- 锁屏风格的大时钟（蓝→粉渐变）、日期、问候
+- CPU / 内存 / 磁盘 / 电池磁贴，带 iOS 风格滑条（服务器上自动换成 GPU 或运行时长）
+- 工作区（目录、git 分支和改动、conda 环境）和系统信息（主机、IP、ssh 来源）
+- 一排常用快捷键胶囊
+
+窄窗口自动变成两列；`hud -c` 是一行精简版。`SAKURA_WELCOME=2` 让新标签页只显示精简版，`0` 关闭。
 
 ## 快捷命令
 
@@ -108,7 +119,8 @@ macOS 上再做一步：iTerm2 → **Settings → Profiles** → 选 **Mist Saku
 
 | 命令 | 作用 |
 |---|---|
-| `sakura` | 速查表 |
+| `sakura` / `hud` | 控制中心 |
+| `sakura help` | 速查表 |
 | `sakura update` | 拉取最新版并重新安装 |
 | `sakura doctor` | 检查依赖是否齐全 |
 
@@ -123,9 +135,10 @@ macOS 上再做一步：iTerm2 → **Settings → Profiles** → 选 **Mist Saku
 | `SAKURA_REMOTE_PROFILE` | `Sakura Glass` | 远程时切到哪个 iTerm2 配置文件 |
 | `SAKURA_AUTO_SWITCH` | `1` | `0` 关闭远程自动切换 |
 | `SAKURA_P10K_COLORS` | `1` | `0` 保留你自己的 p10k 配色 |
-| `SAKURA_WELCOME` | `1` | `0` 关闭欢迎面板 |
+| `SAKURA_WELCOME` | `1` | 新标签页的控制中心：`1` 完整、`2` 精简、`0` 关闭 |
 | `SAKURA_TMUX_HOST` | 空 | `st` 连接的主机 |
 | `SAKURA_TMUX_SESSION` | `main` | `st` 默认会话名 |
+| `SAKURA_TMUX_PROFILE` | 同远程配置文件 | `st` 新窗口用的 iTerm2 配置文件（tmux 窗口会继承它） |
 
 ## 安装脚本做了什么
 

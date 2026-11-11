@@ -1,4 +1,4 @@
-# modules/theme.zsh — blue/pink colors, iTerm2 profile switching, `st`, welcome banner
+# modules/theme.zsh — blue/pink colors, iTerm2 profile switching, `st`
 # Part of Sakura Term: https://github.com/liuxiaZzz/sakura-term
 # Settings can be overridden in ~/.zshrc before the sakura-term source line.
 
@@ -7,9 +7,9 @@
 : ${SAKURA_REMOTE_PROFILE:="Sakura Glass"}  # profile used while in ssh / tssh / mosh
 : ${SAKURA_AUTO_SWITCH:=1}                  # 1 = switch profile on remote sessions
 : ${SAKURA_P10K_COLORS:=1}                  # 1 = recolor powerlevel10k segments
-: ${SAKURA_WELCOME:=1}                      # 1 = show the "Command Center" banner on new tabs
 : ${SAKURA_TMUX_HOST:=}                     # host for `st` (e.g. "me@server"); empty = disabled
 : ${SAKURA_TMUX_SESSION:=main}              # default tmux session name for `st`
+                                            # SAKURA_TMUX_PROFILE: profile for `st` windows (default: remote profile)
 
 _sakura_local_iterm() {
   [[ $TERM_PROGRAM == iTerm.app && -z $SSH_CONNECTION && -z $TMUX ]]
@@ -73,46 +73,17 @@ if (( SAKURA_AUTO_SWITCH )) && _sakura_local_iterm; then
 fi
 
 # ─── 3. st: jump into a remote tmux session (iTerm2 tmux integration) ───────
+# Opens a NEW window that already uses the dark profile: iTerm2's tmux windows inherit the
+# profile of the session that connects, so starting from a local (light) tab would make them light.
+: ${SAKURA_TMUX_PROFILE:=$SAKURA_REMOTE_PROFILE}
 if [[ -n $SAKURA_TMUX_HOST ]] && _sakura_local_iterm; then
-  function st { ssh -t "$SAKURA_TMUX_HOST" "tmux -CC new-session -A -s ${1:-$SAKURA_TMUX_SESSION}" }
-fi
-
-# ─── 4. welcome banner (theme-aware colors, shown once per tab) ─────────────
-_sakura_welcome() {
-  add-zsh-hook -d precmd _sakura_welcome   # run once, at the first prompt
-  [[ -t 1 && -z $SAKURA_WELCOME_SHOWN ]] || return
-  export SAKURA_WELCOME_SHOWN=1
-
-  local hour=$(date +%H) period
-  if   (( 10#$hour < 6  )); then period="夜深了"
-  elif (( 10#$hour < 12 )); then period="早上好"
-  elif (( 10#$hour < 18 )); then period="下午好"
-  else                           period="晚上好"; fi
-
-  local -a greetings=(
-    "${period}，系统已上线，开始掌控今天。"
-    "${period}，保持冷静，保持锋利。"
-    "${period}，先锁定目标，再击穿问题。"
-    "${period}，终端已就绪，思路开始加速。"
-    "${period}，今天的主线任务交给你了。"
-    "${period}，少一点噪音，多一点执行。"
-  )
-  local -a notes=("Focus mode" "Build mode" "Debug mode" "Deep work" "Command ready")
-  local greeting=${greetings[RANDOM % $#greetings + 1]}
-  local note=${notes[RANDOM % $#notes + 1]}
-  local cwd=${PWD/#$HOME/\~} now=$(date '+%Y-%m-%d %H:%M:%S %Z')
-
-  # ANSI theme colors (not fixed 256-colors), so it fits light and dark themes
-  printf "\n"
-  printf "  \e[35m✻\e[0m \e[1;34mCommand Center\e[0m \e[90m%s\e[0m\n" "$period"
-  printf "  \e[90m╭──────────────────────────────────────────────╮\e[0m\n"
-  printf "  \e[90m│ workspace\e[0m  \e[39m%s\e[0m\n" "$cwd"
-  printf "  \e[90m│ time     \e[0m  \e[39m%s\e[0m\n" "$now"
-  printf "  \e[90m│ mode     \e[0m  \e[34m%s\e[0m\n" "$note"
-  printf "  \e[90m│ status   \e[0m  \e[36mready for next command\e[0m\n"
-  printf "  \e[90m╰─\e[0m \e[35m%s\e[0m\n\n" "$greeting"
-}
-if (( SAKURA_WELCOME )) && [[ -o interactive ]]; then
-  autoload -Uz add-zsh-hook
-  add-zsh-hook precmd _sakura_welcome
+  function st {
+    osascript - "$SAKURA_TMUX_PROFILE" "$SAKURA_TMUX_HOST" "${1:-$SAKURA_TMUX_SESSION}" <<'APPLESCRIPT'
+on run argv
+  tell application "iTerm2"
+    create window with profile (item 1 of argv) command "ssh -t " & (item 2 of argv) & " \"tmux -CC new-session -A -s " & (item 3 of argv) & "\""
+  end tell
+end run
+APPLESCRIPT
+  }
 fi

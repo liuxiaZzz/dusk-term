@@ -17,4 +17,5 @@ for _sakura_m in shell theme tools remote; do
   (( ${SAKURA_MODULES[(Ie)$_sakura_m]} )) && [[ -f $SAKURA_DIR/modules/$_sakura_m.zsh ]] && source $SAKURA_DIR/modules/$_sakura_m.zsh
 done
 unset _sakura_m
+source $SAKURA_DIR/modules/center.zsh   # Control Center: `cc`, shown on new tabs
 source $SAKURA_DIR/modules/core.zsh
