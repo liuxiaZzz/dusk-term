@@ -72,7 +72,7 @@ Type `dusk` for a command palette with everything. With fzf installed you can ty
 
 - **Auto-switch:** `ssh` / `tssh` / `mosh` switch the window to your remote profile and back when you leave (iTerm2).
 - **Prompt:** powerlevel10k segments in six muted blue/pink tones.
-- **Typing colors:** valid commands turn blue, typos pink, as you type.
+- **Typing colors:** valid commands turn blue, typos pink, as you type — also on servers without Dusk, because the palette's "green" slot is blue.
 - **Hostname watermark:** while you're on a server, its name shows small and faint in the top-right corner.
 
 Change any of it later with `dusk theme` (menus, or `dusk theme glass split`); the current tab switches right away.

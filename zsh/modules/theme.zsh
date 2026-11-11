@@ -79,7 +79,7 @@ if (( DUSK_SYNTAX_COLORS )); then
     local k
     for k in command builtin alias suffix-alias global-alias function precommand \
              hashed-command reserved-word arg0 autodirectory; do
-      ZSH_HIGHLIGHT_STYLES[$k]='fg=4,bold'
+      ZSH_HIGHLIGHT_STYLES[$k]='fg=4'          # not bold: dark themes draw bold text in their pink bold color
     done
     ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=5'
     ZSH_HIGHLIGHT_STYLES[path]='underline'

@@ -30,7 +30,7 @@ DUSK_DARK = {
     "Tab Color":           "#0b1734",
     "Ansi 0 Color":  "#1a2a52", "Ansi 8 Color":  "#5f7099",
     "Ansi 1 Color":  "#ff5c8a", "Ansi 9 Color":  "#ff7fa6",
-    "Ansi 2 Color":  "#ffa6cf", "Ansi 10 Color": "#ffc4e1",   # "green" slot is pink
+    "Ansi 2 Color":  "#8fc4ff", "Ansi 10 Color": "#b3d7ff",   # "green" slot is blue (valid commands); typos use red = rose
     "Ansi 3 Color":  "#ffd4a3", "Ansi 11 Color": "#ffe3c2",
     "Ansi 4 Color":  "#7aa2ff", "Ansi 12 Color": "#9ebcff",
     "Ansi 5 Color":  "#ff8fd0", "Ansi 13 Color": "#ffb3e0",
@@ -54,7 +54,7 @@ DUSK_LIGHT = {
     "Tab Color":           "#e8e4e8",
     "Ansi 0 Color":  "#dbd4da", "Ansi 8 Color":  "#9a98ad",
     "Ansi 1 Color":  "#c4566e", "Ansi 9 Color":  "#d46a82",
-    "Ansi 2 Color":  "#c9628f", "Ansi 10 Color": "#d77ea3",   # "green" slot is pink
+    "Ansi 2 Color":  "#3b78b5", "Ansi 10 Color": "#5592c8",   # "green" slot is blue (valid commands); typos use red = rose
     "Ansi 3 Color":  "#c08a4a", "Ansi 11 Color": "#cf9a5c",
     "Ansi 4 Color":  "#4f6fb3", "Ansi 12 Color": "#6a87c4",
     "Ansi 5 Color":  "#d07aa6", "Ansi 13 Color": "#dc8fb6",
@@ -77,7 +77,7 @@ DUSK_GLASS_LIGHT = {
     "Tab Color":           "#f3f4fa",
     "Ansi 0 Color":  "#e3e5ef", "Ansi 8 Color":  "#7f84a3",
     "Ansi 1 Color":  "#c2496a", "Ansi 9 Color":  "#d35c7c",
-    "Ansi 2 Color":  "#c4558b", "Ansi 10 Color": "#d06a9b",
+    "Ansi 2 Color":  "#2f72b0", "Ansi 10 Color": "#4b8cc6",
     "Ansi 3 Color":  "#b47a32", "Ansi 11 Color": "#c68b44",
     "Ansi 4 Color":  "#3f63b8", "Ansi 12 Color": "#5a7cc8",
     "Ansi 5 Color":  "#c4669c", "Ansi 13 Color": "#d47fae",
@@ -100,7 +100,7 @@ DUSK_GLASS_DARK = {
     "Tab Color":           "#0f1730",
     "Ansi 0 Color":  "#1c2a52", "Ansi 8 Color":  "#6c7ca6",
     "Ansi 1 Color":  "#ff6a94", "Ansi 9 Color":  "#ff88ab",
-    "Ansi 2 Color":  "#ffaad2", "Ansi 10 Color": "#ffc8e3",
+    "Ansi 2 Color":  "#96c8ff", "Ansi 10 Color": "#b8dbff",
     "Ansi 3 Color":  "#ffd6a8", "Ansi 11 Color": "#ffe5c6",
     "Ansi 4 Color":  "#86abff", "Ansi 12 Color": "#a8c3ff",
     "Ansi 5 Color":  "#ff9fd2", "Ansi 13 Color": "#ffbce2",
