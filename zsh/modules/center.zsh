@@ -223,11 +223,11 @@ _cc_full() {
   if [[ -n ${CC[env]} ]]; then ws+=("%F{4}$_CC_ICON[py]%f ${CC[env]}")
   else ws+=("%F{8}$_CC_ICON[py] 无 Python 环境%f"); fi
   _cc_uptime ${CC[up]:-0}; local up=$REPLY
-  _cc_fit "${(%):-%m}" $(( cw - ${#CC[os]} - 2 )); _cc_esc "$REPLY"
-  local -a sy=("%F{4}$_CC_ICON[host]%f $REPLY  %F{8}${CC[os]}%f")
+  _cc_fit "${(%):-%m}" $cw; _cc_esc "$REPLY"
+  local -a sy=("%F{4}$_CC_ICON[host]%f $REPLY")
   x="%F{5}$_CC_ICON[net]%f ${CC[ip]:-离线}"
   [[ -n ${CC[from]} ]] && x+="  %F{8}$_CC_ICON[ssh] 来自 ${CC[from]}%f"
-  sy+=("$x" "%F{4}$_CC_ICON[up]%f 已运行 $up")
+  sy+=("$x" "%F{4}$_CC_ICON[up]%f 已运行 $up  %F{8}${CC[os]}%f")
   if (( per == 4 )); then
     _cc_card $hw "%F{4}工作区%f" "${ws[@]}"; local -a c1=("${reply[@]}")
     _cc_card $hw2 "%F{4}系统%f" "${sy[@]}"; local -a c2=("${reply[@]}")
@@ -238,7 +238,12 @@ _cc_full() {
   fi
 
   # 4. quick actions, like Control Center buttons
-  local -a pills=("j 跳转" "⌃R 历史" "⌃T 找文件" "x 解压" "hud 面板" "sakura help")
+  local -a pills=()
+  (( $+functions[j] || $+aliases[j] )) && pills+=("j 跳转")
+  pills+=("⌃R 历史" "⌃T 找文件")
+  (( $+aliases[x] )) && pills+=("x 解压")
+  pills+=("hud 面板")
+  (( $+functions[sakura] )) && pills+=("sakura help")
   local p bar="" k=0
   for p in $pills; do
     (( k++ % 2 )) && bar+="%K{5}%F{0} $p %f%k " || bar+="%K{4}%F{0} $p %f%k "
