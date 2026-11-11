@@ -402,11 +402,6 @@ fi
 
 touch "$ZSHRC"
 cp "$ZSHRC" "$ZSHRC.bak-dusk"
-# an older welcome banner would show up next to Dusk's Control Center: switch its call off
-if grep -qE '^[[:space:]]*show_terminal_welcome[[:space:]]*$' "$ZSHRC"; then
-  sed -i.tmp -E 's/^([[:space:]]*)show_terminal_welcome[[:space:]]*$/\1# show_terminal_welcome   # replaced by the Dusk Control Center (hud)/' "$ZSHRC" && rm -f "$ZSHRC.tmp"
-  OLD_WELCOME=1
-fi
 awk -v b="$BEGIN" -v e="$END" '$0==b{skip=1} !skip{print} $0==e{skip=0}' "$ZSHRC.bak-dusk" > "$ZSHRC"
 conf_ref="${CONF_DIR/#$HOME/\$HOME}"
 {
@@ -414,6 +409,11 @@ conf_ref="${CONF_DIR/#$HOME/\$HOME}"
   echo "[[ -f \"$conf_ref/dusk.zsh\" ]] && source \"$conf_ref/dusk.zsh\""
   echo "$END"
 } >> "$ZSHRC"
+# an older welcome banner would show up next to Dusk's Control Center: switch its call off
+if grep -qE '^[[:space:]]*show_terminal_welcome[[:space:]]*$' "$ZSHRC"; then
+  sed -i.tmp -E 's/^([[:space:]]*)show_terminal_welcome[[:space:]]*$/\1# show_terminal_welcome   # replaced by the Dusk Control Center (hud)/' "$ZSHRC" && rm -f "$ZSHRC.tmp"
+  OLD_WELCOME=1
+fi
 ok "$(short "$ZSHRC")" "$(t '已接入，备份为 .zshrc.bak-dusk' 'hooked, backup at .zshrc.bak-dusk')"
 [[ -n ${OLD_WELCOME:-} ]] && ok "$(t '旧的欢迎面板' 'old welcome banner')" "$(t '已停用，由控制中心代替' 'switched off, the Control Center replaces it')"
 if [[ -n $TMUX_HOST ]]; then ok "${TMUX_CMD:-tm}" "tmux → $TMUX_HOST"; fi
