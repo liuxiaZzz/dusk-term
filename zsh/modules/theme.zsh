@@ -1,22 +1,35 @@
 # modules/theme.zsh — blue/pink colors, iTerm2 profile switching, `st`
-# Part of Sakura Term: https://github.com/liuxiaZzz/sakura-term
-# Settings can be overridden in ~/.zshrc before the sakura-term source line.
+# Part of Dusk: https://github.com/liuxiaZzz/dusk-term
+# Settings can be overridden in ~/.zshrc before the dusk source line.
 
-# ─── settings ────────────────────────────────────────────────────────────────
-: ${SAKURA_LOCAL_PROFILE:="Mist Sakura"}    # fallback local profile when switching back
-: ${SAKURA_REMOTE_PROFILE:="Sakura Glass"}  # profile used while in ssh / tssh / mosh
-: ${SAKURA_AUTO_SWITCH:=1}                  # 1 = switch profile on remote sessions
-: ${SAKURA_P10K_COLORS:=1}                  # 1 = recolor powerlevel10k segments
-: ${SAKURA_TMUX_HOST:=}                     # host for `st` (e.g. "me@server"); empty = disabled
-: ${SAKURA_TMUX_SESSION:=main}              # default tmux session name for `st`
-                                            # SAKURA_TMUX_PROFILE: profile for `st` windows (default: remote profile)
+# ─── settings (written by install.sh / `dusk theme` / `dusk tmux` into config.zsh) ─
+: ${DUSK_STYLE:=classic}          # classic | glass
+: ${DUSK_MODE:=split}             # split (light here, dark on remote) | dark | light
+: ${DUSK_P10K_COLORS:=1}          # 1 = recolor powerlevel10k segments
+: ${DUSK_TMUX_HOST:=}             # host for the tmux command, e.g. me@server; empty = off
+: ${DUSK_TMUX_SESSION:=main}      # default tmux session
+: ${DUSK_TMUX_CMD:=st}            # name of the tmux command (st, jt, ...)
+: ${DUSK_TMUX_PROFILE:=}          # iTerm2 profile for tmux windows; empty = the remote profile
 
-_sakura_local_iterm() {
+# style + mode → which iTerm2 profile is used where (recomputed by `dusk theme`)
+_dusk_profiles() {
+  local light dark
+  if [[ $DUSK_STYLE == glass ]]; then light="Dusk Glass Light"; dark="Dusk Glass Dark"
+  else light="Dusk Light"; dark="Dusk Dark"; fi
+  case $DUSK_MODE in
+    dark)  typeset -g DUSK_LOCAL_PROFILE=$dark  DUSK_REMOTE_PROFILE=$dark  DUSK_AUTO_SWITCH=0 ;;
+    light) typeset -g DUSK_LOCAL_PROFILE=$light DUSK_REMOTE_PROFILE=$light DUSK_AUTO_SWITCH=0 ;;
+    *)     typeset -g DUSK_LOCAL_PROFILE=$light DUSK_REMOTE_PROFILE=$dark  DUSK_AUTO_SWITCH=1 ;;
+  esac
+}
+_dusk_profiles
+
+_dusk_local_iterm() {
   [[ $TERM_PROGRAM == iTerm.app && -z $SSH_CONNECTION && -z $TMUX ]]
 }
 
 # ─── 1. powerlevel10k: six muted blue/pink tones ────────────────────────────
-if (( SAKURA_P10K_COLORS )); then
+if (( DUSK_P10K_COLORS )); then
   () {
     local hot='#e48bb4' pastel='#efc6db' sapphire='#4a62ad'
     local sky='#a3cbe6' peri='#b7c0e6'   navy='#1d2a4c'
@@ -55,35 +68,41 @@ if (( SAKURA_P10K_COLORS )); then
   (( ! $+functions[p10k] )) || p10k reload
 fi
 
-# ─── 2. remote sessions use the dark theme, local keeps your default ────────
-if (( SAKURA_AUTO_SWITCH )) && _sakura_local_iterm; then
-  _sakura_set_profile() { printf '\e]1337;SetProfile=%s\a' "$1" }
-
-  _sakura_remote() {
-    _sakura_set_profile "$SAKURA_REMOTE_PROFILE"
+# ─── 2. remote sessions use the remote profile, then switch back ────────────
+_dusk_set_profile() { printf '\e]1337;SetProfile=%s\a' "$1" }
+if _dusk_local_iterm; then
+  _dusk_remote() {
+    (( DUSK_AUTO_SWITCH )) || { command "$@"; return }
+    _dusk_set_profile "$DUSK_REMOTE_PROFILE"
     command "$@"
     local rc=$?
-    _sakura_set_profile "${ITERM_PROFILE:-$SAKURA_LOCAL_PROFILE}"
+    _dusk_set_profile "${ITERM_PROFILE:-$DUSK_LOCAL_PROFILE}"
     return $rc
   }
   # `function name` form so it still works when e.g. `tssh` is an alias
-  function ssh  { _sakura_remote ssh  "$@" }
-  function mosh { _sakura_remote mosh "$@" }
-  (( $+commands[tssh] )) && function tssh { _sakura_remote tssh "$@" }
+  function ssh  { _dusk_remote ssh  "$@" }
+  function mosh { _dusk_remote mosh "$@" }
+  (( $+commands[tssh] )) && function tssh { _dusk_remote tssh "$@" }
 fi
 
-# ─── 3. st: jump into a remote tmux session (iTerm2 tmux integration) ───────
-# Opens a NEW window that already uses the dark profile: iTerm2's tmux windows inherit the
+# ─── 3. tmux on a server in one command (iTerm2 tmux integration) ───────────
+# Opens a NEW window that already uses the right profile: iTerm2's tmux windows inherit the
 # profile of the session that connects, so starting from a local (light) tab would make them light.
-: ${SAKURA_TMUX_PROFILE:=$SAKURA_REMOTE_PROFILE}
-if [[ -n $SAKURA_TMUX_HOST ]] && _sakura_local_iterm; then
-  function st {
-    osascript - "$SAKURA_TMUX_PROFILE" "$SAKURA_TMUX_HOST" "${1:-$SAKURA_TMUX_SESSION}" <<'APPLESCRIPT'
+#   st            session $DUSK_TMUX_SESSION     st work      another session
+# The command name is $DUSK_TMUX_CMD (set with `dusk tmux`).
+_dusk_tmux() {
+  [[ -n $DUSK_TMUX_HOST ]] || { print "还没设置服务器：运行 dusk tmux"; return 1 }
+  osascript - "${DUSK_TMUX_PROFILE:-$DUSK_REMOTE_PROFILE}" "$DUSK_TMUX_HOST" "${1:-$DUSK_TMUX_SESSION}" <<'APPLESCRIPT'
 on run argv
   tell application "iTerm2"
     create window with profile (item 1 of argv) command "ssh -t " & (item 2 of argv) & " \"tmux -CC new-session -A -s " & (item 3 of argv) & "\""
   end tell
 end run
 APPLESCRIPT
-  }
-fi
+}
+_dusk_bind_tmux() {   # (re)define the user's chosen command name
+  [[ -n $DUSK_TMUX_HOST && -n $DUSK_TMUX_CMD ]] && _dusk_local_iterm || return 0
+  (( $+aliases[$DUSK_TMUX_CMD] )) && unalias $DUSK_TMUX_CMD
+  functions[$DUSK_TMUX_CMD]='_dusk_tmux "$@"'
+}
+_dusk_bind_tmux

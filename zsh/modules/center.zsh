@@ -1,11 +1,11 @@
-# modules/center.zsh — Sakura Control Center (macOS + Linux)
+# modules/center.zsh — Dusk Control Center (macOS + Linux)
 # A lock-screen style clock and Control Center style tiles, shown once per new tab.
-#   sakura / hud  show it again any time
+#   dusk / hud    show it again any time
 #   hud -c        compact one-liner
-# SAKURA_WELCOME=1 full (default) · 2 compact · 0 off   (never automatic inside tmux)
+# DUSK_WELCOME=1 full (default) · 2 compact · 0 off   (never automatic inside tmux)
 # Colors are ANSI theme colors, so it follows whichever iTerm2 profile is active.
 
-: ${SAKURA_WELCOME:=1}
+: ${DUSK_WELCOME:=1}
 zmodload -F zsh/datetime b:strftime p:EPOCHSECONDS 2>/dev/null
 
 # ─── look ────────────────────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ _cc_full() {
   local -a cl=("")
   for i in 1 2 3; do cl+=("  %B%F{${_CC_ROWCOLOR[i]}}${clock[i]}%f%b   ${right[i]}"); done
   cl+=("")
-  _cc_card $W "%F{4}Sakura%f %F{5}Control Center%f" "${cl[@]}"; lines+=("${reply[@]}")
+  _cc_card $W "%F{4}Dusk%f %F{5}Control Center%f" "${cl[@]}"; lines+=("${reply[@]}")
 
   # 2. tiles
   local bw=$(( tw - 4 ))
@@ -243,7 +243,7 @@ _cc_full() {
   pills+=("⌃R 历史" "⌃T 找文件")
   (( $+aliases[x] )) && pills+=("x 解压")
   pills+=("hud 面板")
-  (( $+functions[sakura] )) && pills+=("sakura help")
+  (( $+functions[dusk] )) && pills+=("dusk help")
   local p bar="" k=0
   for p in $pills; do
     (( k++ % 2 )) && bar+="%K{5}%F{0} $p %f%k " || bar+="%K{4}%F{0} $p %f%k "
@@ -256,20 +256,20 @@ _cc_full() {
 }
 
 hud() {   # not `cc`: that name belongs to the C compiler
-  export SAKURA_WELCOME_SHOWN=1                  # counts as this tab's welcome
-  (( $+functions[add-zsh-hook] )) && add-zsh-hook -d precmd _sakura_welcome 2>/dev/null
+  export DUSK_WELCOME_SHOWN=1                  # counts as this tab's welcome
+  (( $+functions[add-zsh-hook] )) && add-zsh-hook -d precmd _dusk_welcome 2>/dev/null
   if [[ $1 == -c ]]; then _cc_compact; else _cc_full; fi
 }
 
 # ─── show once per new tab ──────────────────────────────────────────────────
-_sakura_welcome() {
-  add-zsh-hook -d precmd _sakura_welcome
-  [[ -t 1 && -z $SAKURA_WELCOME_SHOWN ]] || return
+_dusk_welcome() {
+  add-zsh-hook -d precmd _dusk_welcome
+  [[ -t 1 && -z $DUSK_WELCOME_SHOWN ]] || return
   [[ -n $TMUX ]] && return                       # every tmux pane is a new shell: stay quiet, `hud` on demand
-  export SAKURA_WELCOME_SHOWN=1
-  if (( SAKURA_WELCOME == 2 || ${COLUMNS:-80} < 50 )); then _cc_compact; else _cc_full; fi
+  export DUSK_WELCOME_SHOWN=1
+  if (( DUSK_WELCOME == 2 || ${COLUMNS:-80} < 50 )); then _cc_compact; else _cc_full; fi
 }
-if (( SAKURA_WELCOME )) && [[ -o interactive ]]; then
+if (( DUSK_WELCOME )) && [[ -o interactive ]]; then
   autoload -Uz add-zsh-hook
-  add-zsh-hook precmd _sakura_welcome
+  add-zsh-hook precmd _dusk_welcome
 fi

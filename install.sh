@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
-# Sakura Term installer — macOS + Linux
+# Dusk installer — macOS + Linux
 #
 #   ./install.sh                              everything; role is detected automatically:
 #                                               macOS → local (iTerm2 themes, tssh client)
 #                                               Linux → server (trz/tsz for file transfer)
 #   ./install.sh --role local|server          override the detected role
 #   ./install.sh --modules theme,tools        pick modules (shell, theme, tools, remote)
-#   ./install.sh --style classic|glass        classic: Mist Sakura + Sakura Glass (5% see-through)
-#                                             glass:   Sakura Frost + Sakura Frost Night (frosted glass)
+#   ./install.sh --style classic|glass        classic: Dusk Light + Dusk Dark (5% see-through)
+#                                             glass:   Dusk Glass Light + Dusk Glass Dark (frosted glass)
 #   ./install.sh --mode split|dark|light      split: light locally, dark on remote hosts (auto switch)
 #                                             dark / light: one look everywhere
 #   ./install.sh -y                           no questions, use defaults (classic, split)
-#   ./install.sh --tmux-host me@server        enable `st` (tmux on that host via iTerm2)
+#   ./install.sh --tmux-host me@server        one command to open tmux on that host (see `dusk tmux`)
+#
+# Running it again keeps your earlier answers unless you pass a new value.
 #   ./install.sh --no-deps                    don't download anything (oh-my-zsh, fzf, ...)
 #   ./install.sh --themes-only                only the iTerm2 profiles (macOS)
 #
@@ -21,14 +23,14 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OS="$(uname -s)"
 ITERM_DIR="$HOME/Library/Application Support/iTerm2/DynamicProfiles"
-CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/sakura-term"
+CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/dusk"
 ZSHRC="${ZDOTDIR:-$HOME}/.zshrc"
 BIN="$HOME/.local/bin"
 export PATH="$BIN:$PATH"
-BEGIN="# >>> sakura-term >>>"
-END="# <<< sakura-term <<<"
+BEGIN="# >>> dusk >>>"
+END="# <<< dusk <<<"
 
-MODULES="shell,theme,tools,remote"
+MODULES=""
 ROLE=""
 TMUX_HOST=""
 DEPS=1
@@ -36,7 +38,6 @@ THEMES_ONLY=0
 STYLE=""
 MODE=""
 ASK=1
-ARGS=("$@")
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --modules)     MODULES="${2:?--modules needs a list, e.g. theme,tools}"; shift 2 ;;
@@ -51,6 +52,14 @@ while [[ $# -gt 0 ]]; do
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
 done
+# earlier answers (config.zsh from a previous run) are the defaults this time
+cfg_get() { [[ -f "$CONF_DIR/config.zsh" ]] && sed -nE "s/^: \\\$\{$1:='(.*)'\}$/\1/p" "$CONF_DIR/config.zsh" | tail -1 || true; }
+PREV_MODULES="$( [[ -f "$CONF_DIR/config.zsh" ]] && sed -nE 's/^typeset -ga DUSK_MODULES=\((.*)\)$/\1/p' "$CONF_DIR/config.zsh" | tr ' ' ',' || true)"
+MODULES=${MODULES:-${PREV_MODULES:-shell,theme,tools,remote}}
+ROLE=${ROLE:-$(cfg_get DUSK_ROLE)}
+PREV_STYLE=$(cfg_get DUSK_STYLE); PREV_MODE=$(cfg_get DUSK_MODE)
+TMUX_SESSION=$(cfg_get DUSK_TMUX_SESSION); TMUX_CMD=$(cfg_get DUSK_TMUX_CMD); TMUX_PROFILE=$(cfg_get DUSK_TMUX_PROFILE)
+PREV_TMUX_HOST=$(cfg_get DUSK_TMUX_HOST)
 has_mod() { [[ ",$MODULES," == *",$1,"* ]]; }
 [[ -n $ROLE ]] || ROLE=$([[ $OS == Darwin ]] && echo local || echo server)
 [[ $ROLE == local || $ROLE == server ]] || { echo "--role must be local or server" >&2; exit 1; }
@@ -112,7 +121,7 @@ skip() { printf '     %s· %s %s%s\n' "$MUTE" "$(pad "$1" 24)" "${2:-$(t 已存�
 warn() { printf '     %s!%s %s\n' "$ROSE" "$N" "$1"; }
 NOTES=()   # "text|command" pairs for the finish card
 
-LOG="$(mktemp -t sakura-term.XXXXXX)"
+LOG="$(mktemp -t dusk.XXXXXX)"
 trap 'rm -f "$LOG"' EXIT
 # run <label> <detail-on-success> <cmd...>: pink spinner while it runs, ✓ or ! when done
 run() {
@@ -148,7 +157,7 @@ short() { printf '%s' "${1/#$HOME/~}"; }
 os_name=$([[ $OS == Darwin ]] && echo macOS || echo Linux)
 role_name=$([[ $ROLE == local ]] && t 本机 local || t 服务器 server)
 echo
-printf '  %s ✻ Sakura Term %s %s · %s %s %s %s\n' \
+printf '  %s ✻ Dusk %s %s · %s %s %s %s\n' \
   "$BG_PINK$WHITE$BOLD" "$N$BG_SAPPHIRE$WHITE" "$role_name" "$os_name" "$N$BG_NAVY$BLUSH" "${MODULES//,/ · }" "$N"
 printf '  %s%s%s\n' "$MUTE" "$(t '蓝粉终端套件 · 主题、shell 环境与快捷命令' 'blue & pink terminal kit · themes, shell and shortcuts')" "$N"
 
@@ -177,38 +186,52 @@ WANT_THEME=0; [[ $OS == Darwin && $ROLE == local ]] && { has_mod theme || (( THE
 CAN_ASK=0; (( ASK && TTY )) && [[ -r /dev/tty ]] && CAN_ASK=1
 if (( WANT_THEME )); then
   if [[ -z $STYLE ]]; then
-    STYLE=classic
+    STYLE=${PREV_STYLE:-classic}
     if (( CAN_ASK )); then
-      choose "$(t 选择风格 'Pick a style')" 1 \
-        "$(t 经典 Classic)|$(t '雾白樱 + Sakura Glass，5% 透明' 'Mist Sakura + Sakura Glass, 5% see-through')" \
-        "$(t 玻璃 Glass)|$(t 'Sakura Frost + Frost Night，毛玻璃' 'Sakura Frost + Frost Night, frosted glass')"
-      (( REPLY == 2 )) && STYLE=glass
+      choose "$(t 选择风格 'Pick a style')" $([[ $STYLE == glass ]] && echo 2 || echo 1) \
+        "$(t 经典 Classic)|$(t 'Dusk Light + Dusk Dark，5% 透明' 'Dusk Light + Dusk Dark, 5% see-through')" \
+        "$(t 玻璃 Glass)|$(t 'Dusk Glass Light + Glass Dark，毛玻璃' 'Dusk Glass Light + Glass Dark, frosted glass')"
+      STYLE=$([[ $REPLY == 2 ]] && echo glass || echo classic)
     fi
   fi
   if [[ -z $MODE ]]; then
-    MODE=split
+    MODE=${PREV_MODE:-split}
     if (( CAN_ASK )); then
-      choose "$(t '本机和远程' 'Local and remote')" 1 \
+      mode_idx=1; [[ $MODE == dark ]] && mode_idx=2; [[ $MODE == light ]] && mode_idx=3
+      choose "$(t '本机和远程' 'Local and remote')" $mode_idx \
         "$(t 分开 Split)|$(t '本机浅色，ssh 到服务器自动换深色' 'light here, dark automatically on ssh')" \
         "$(t 全深色 Dark)|$(t '到处都用深色' 'dark everywhere')" \
         "$(t 全浅色 Light)|$(t '到处都用浅色' 'light everywhere')"
-      case $REPLY in 2) MODE=dark ;; 3) MODE=light ;; esac
+      case $REPLY in 2) MODE=dark ;; 3) MODE=light ;; *) MODE=split ;; esac
+    fi
+  fi
+  # one command into tmux on a server (optional)
+  if [[ -z $TMUX_HOST ]]; then
+    TMUX_HOST=$PREV_TMUX_HOST
+    if (( CAN_ASK )); then
+      printf '\n  %s ? %s %s%s%s\n' "$BG_SAPPHIRE$WHITE$BOLD" "$N" "$BLUE$BOLD" "$(t '一键进服务器 tmux（可选）' 'One command into tmux on a server (optional)')" "$N"
+      printf '     %s%s%s\n' "$MUTE" "$(t '填 user@host 或 ~/.ssh/config 里的名字；回车跳过，以后可用 dusk tmux 设置' 'user@host or a name from ~/.ssh/config; Enter to skip (later: dusk tmux)')" "$N"
+      printf '     %s❯%s %s' "$PINK" "$N" "$(t "服务器 [${TMUX_HOST:-跳过}]：" "Server [${TMUX_HOST:-skip}]: ")"
+      IFS= read -r ans </dev/tty || ans=""
+      [[ -n $ans ]] && TMUX_HOST=$ans
+      if [[ -n $TMUX_HOST ]]; then
+        printf '     %s❯%s %s' "$PINK" "$N" "$(t "命令叫什么 [${TMUX_CMD:-st}]：" "Command name [${TMUX_CMD:-st}]: ")"
+        IFS= read -r ans </dev/tty || ans=""
+        [[ -n $ans ]] && TMUX_CMD=$ans
+      fi
     fi
   fi
 fi
 STYLE=${STYLE:-classic}; MODE=${MODE:-split}
-if [[ $STYLE == glass ]]; then LIGHT_P="Sakura Frost"; DARK_P="Sakura Frost Night"
-else                          LIGHT_P="Mist Sakura";  DARK_P="Sakura Glass"; fi
+if [[ $STYLE == glass ]]; then LIGHT_P="Dusk Glass Light"; DARK_P="Dusk Glass Dark"
+else                          LIGHT_P="Dusk Light";  DARK_P="Dusk Dark"; fi
 case $MODE in
   split) LOCAL_P=$LIGHT_P; REMOTE_P=$DARK_P; AUTO=1 ;;
   dark)  LOCAL_P=$DARK_P;  REMOTE_P=$DARK_P; AUTO=0 ;;
   light) LOCAL_P=$LIGHT_P; REMOTE_P=$LIGHT_P; AUTO=0 ;;
 esac
-# remember the answers so `sakura update` doesn't ask again
-[[ " ${ARGS[*]-} " == *" --style "* ]] || ARGS+=(--style "$STYLE")
-[[ " ${ARGS[*]-} " == *" --mode "*  ]] || ARGS+=(--mode "$MODE")
 
-# command names other tools already define (GCR, your aliases): sakura-term will leave them alone
+# command names other tools already define (GCR, your aliases): dusk will leave them alone
 OUR_NAMES="del|rm|delf|empty_trash|gita|gitaa|gitb|gitst|gitl|gitr|gitpl|gitps|gitc|gitch|sz|szn|pid|port|pathadd|mychmod|mychown|cl|sc|listen|upload|download|dps|dsh|dlog|dockeradd"
 TAKEN=""
 if [[ -f $ZSHRC ]]; then
@@ -226,8 +249,16 @@ fi
 if [[ $OS == Darwin && $ROLE == local ]] && { has_mod theme || (( THEMES_ONLY )); }; then
   step "$(t 主题 Themes)"
   mkdir -p "$ITERM_DIR"
-  cp "$REPO_DIR/iterm/sakura-term.json" "$ITERM_DIR/sakura-term.json"
-  ok "$(t 'iTerm2 配置文件' 'iTerm2 profiles')" "Mist Sakura · Sakura Glass · Sakura Frost · Frost Night"
+  # other files defining the same profiles (same GUIDs) would clash: move them to a backup
+  for f in "$ITERM_DIR"/*.json; do
+    [[ -f $f && $(basename "$f") != dusk.json ]] || continue
+    if grep -qE '6f1c9e2a-5b7d-4c1e-9a3f-5a4b7c9e2d01|3d7a1c52-8e4b-4f0a-b6d2-0d1a7e5c9f02|a4e1c7d2-2f6b-4c8a-9e3d-1b7f5a9c0e11|b5f2d8e3-3a7c-4d9b-8f4e-2c8a6b0d1f22' "$f"; then
+      mkdir -p "$CONF_DIR/backup"; mv "$f" "$CONF_DIR/backup/"
+      ok "$(t '移走重复的配置文件' 'moved a clashing profile')" "$(basename "$f") → $(short "$CONF_DIR")/backup"
+    fi
+  done
+  cp "$REPO_DIR/iterm/dusk.json" "$ITERM_DIR/dusk.json"
+  ok "$(t 'iTerm2 配置文件' 'iTerm2 profiles')" "Dusk Light · Dusk Dark · Dusk Glass Light · Glass Dark"
   if [[ $MODE == split ]]; then ok "$(t '本机 / 远程' 'local / remote')" "$LOCAL_P → $REMOTE_P"
   else ok "$(t '统一配色' 'one look')" "$LOCAL_P"; fi
   [[ -d /Applications/iTerm.app ]] || warn "$(t '没找到 iTerm2，可在 https://iterm2.com 下载' 'iTerm2 not found — get it at https://iterm2.com')"
@@ -318,22 +349,24 @@ fi
 # ─── 3. zsh files + config ───────────────────────────────────────────────────
 step "$(t 写入配置 Configure)"
 mkdir -p "$CONF_DIR/modules"
-cp "$REPO_DIR/zsh/sakura-term.zsh" "$CONF_DIR/"
+cp "$REPO_DIR/zsh/dusk.zsh" "$CONF_DIR/"
 cp "$REPO_DIR"/zsh/modules/*.zsh "$CONF_DIR/modules/"
-if [[ $P10K_LAYOUT == 0 && -f "$CONF_DIR/config.zsh" ]] && grep -q 'SAKURA_P10K_LAYOUT=1' "$CONF_DIR/config.zsh"; then
+if [[ $P10K_LAYOUT == 0 && $(cfg_get DUSK_P10K_LAYOUT) == 1 ]]; then
   P10K_LAYOUT=1   # keep the layout we set up on an earlier run
 fi
+cfg_line() { [[ -n $2 ]] && printf ": \${%s:='%s'}\n" "$1" "${2//\'/}"; return 0; }
 {
-  echo "# written by install.sh — rerun it (or \`sakura update\`) instead of editing"
-  echo "typeset -ga SAKURA_MODULES=(${MODULES//,/ })"
-  echo "typeset -g  SAKURA_ROLE=$ROLE"
-  echo "typeset -g  SAKURA_REPO=\"$REPO_DIR\""
-  printf 'typeset -g  SAKURA_INSTALL_ARGS=%q\n' "${ARGS[*]-}"
-  echo "typeset -g  SAKURA_P10K_LAYOUT=$P10K_LAYOUT"
-  echo ": \${SAKURA_LOCAL_PROFILE:=\"$LOCAL_P\"}"
-  echo ": \${SAKURA_REMOTE_PROFILE:=\"$REMOTE_P\"}"
-  echo ": \${SAKURA_AUTO_SWITCH:=$AUTO}"
-  if [[ -n $TMUX_HOST ]]; then echo ": \${SAKURA_TMUX_HOST:=\"$TMUX_HOST\"}"; fi
+  echo "# Dusk settings. install.sh, \`dusk theme\` and \`dusk tmux\` keep this file up to date."
+  echo "typeset -ga DUSK_MODULES=(${MODULES//,/ })"
+  cfg_line DUSK_ROLE "$ROLE"
+  cfg_line DUSK_REPO "$REPO_DIR"
+  cfg_line DUSK_P10K_LAYOUT "$P10K_LAYOUT"
+  cfg_line DUSK_STYLE "$STYLE"
+  cfg_line DUSK_MODE "$MODE"
+  cfg_line DUSK_TMUX_HOST "$TMUX_HOST"
+  cfg_line DUSK_TMUX_SESSION "$TMUX_SESSION"
+  cfg_line DUSK_TMUX_CMD "$TMUX_CMD"
+  cfg_line DUSK_TMUX_PROFILE "$TMUX_PROFILE"
 } > "$CONF_DIR/config.zsh"
 ok "$(t 'zsh 模块' 'zsh modules')" "$(short "$CONF_DIR")"
 if [[ -n $TAKEN ]] && { has_mod tools || has_mod remote; }; then
@@ -342,16 +375,16 @@ if [[ -n $TAKEN ]] && { has_mod tools || has_mod remote; }; then
 fi
 
 touch "$ZSHRC"
-cp "$ZSHRC" "$ZSHRC.bak-sakura-term"
-awk -v b="$BEGIN" -v e="$END" '$0==b{skip=1} !skip{print} $0==e{skip=0}' "$ZSHRC.bak-sakura-term" > "$ZSHRC"
+cp "$ZSHRC" "$ZSHRC.bak-dusk"
+awk -v b="$BEGIN" -v e="$END" '$0==b{skip=1} !skip{print} $0==e{skip=0}' "$ZSHRC.bak-dusk" > "$ZSHRC"
 conf_ref="${CONF_DIR/#$HOME/\$HOME}"
 {
   echo "$BEGIN"
-  echo "[[ -f \"$conf_ref/sakura-term.zsh\" ]] && source \"$conf_ref/sakura-term.zsh\""
+  echo "[[ -f \"$conf_ref/dusk.zsh\" ]] && source \"$conf_ref/dusk.zsh\""
   echo "$END"
 } >> "$ZSHRC"
-ok "$(short "$ZSHRC")" "$(t '已接入，备份为 .zshrc.bak-sakura-term' 'hooked, backup at .zshrc.bak-sakura-term')"
-[[ -n $TMUX_HOST ]] && ok "st" "$(t "tmux → $TMUX_HOST" "tmux → $TMUX_HOST")"
+ok "$(short "$ZSHRC")" "$(t '已接入，备份为 .zshrc.bak-dusk' 'hooked, backup at .zshrc.bak-dusk')"
+if [[ -n $TMUX_HOST ]]; then ok "${TMUX_CMD:-st}" "tmux → $TMUX_HOST"; fi
 
 # ─── 4. done ─────────────────────────────────────────────────────────────────
 if has_mod shell && [[ $OS == Darwin ]] && ! ls "$HOME/Library/Fonts" /Library/Fonts 2>/dev/null | grep -qi nerdfont; then
@@ -369,7 +402,7 @@ cmdline() {  # cmdline <before> <command> <after>: command in pink
 }
 cmdline "$(t '新开一个终端，或运行 ' 'Open a new terminal, or run ')" "exec zsh" ""
 cmdline "$(t '输入 ' 'Type ')" "hud" "$(t '          打开控制中心' '          for the Control Center')"
-cmdline "$(t '输入 ' 'Type ')" "sakura help" "$(t '  查看全部快捷命令' '  for every shortcut')"
+cmdline "$(t '输入 ' 'Type ')" "dusk help" "$(t '  查看全部快捷命令' '  for every shortcut')"
 if (( ${#NOTES[@]} )); then
   card_line ""
   card_line "$(t '还差一步' 'One more thing')" "$SKY$BOLD$(t '还差一步' 'One more thing')$N"

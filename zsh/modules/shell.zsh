@@ -23,7 +23,7 @@ if (( ! $+functions[omz] )) && [[ -d ${ZSH:-$HOME/.oh-my-zsh} ]]; then
 fi
 
 # ─── prompt layout (set by install.sh when it created ~/.p10k.zsh) ──────────
-if (( ${SAKURA_P10K_LAYOUT:-0} )); then
+if (( ${DUSK_P10K_LAYOUT:-0} )); then
   typeset -g POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(os_icon dir vcs ram disk_usage newline prompt_char)
   typeset -g POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status command_execution_time background_jobs
                                                   virtualenv anaconda cpu_arch time newline)

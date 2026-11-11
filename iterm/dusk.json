@@ -1,7 +1,7 @@
 {
   "Profiles": [
     {
-      "Name": "Sakura Glass",
+      "Name": "Dusk Dark",
       "Guid": "6f1c9e2a-5b7d-4c1e-9a3f-5a4b7c9e2d01",
       "Transparency": 0.05,
       "Blur": true,
@@ -207,7 +207,7 @@
       }
     },
     {
-      "Name": "Mist Sakura",
+      "Name": "Dusk Light",
       "Guid": "3d7a1c52-8e4b-4f0a-b6d2-0d1a7e5c9f02",
       "Transparency": 0.05,
       "Blur": true,
@@ -413,7 +413,7 @@
       }
     },
     {
-      "Name": "Sakura Frost",
+      "Name": "Dusk Glass Light",
       "Guid": "a4e1c7d2-2f6b-4c8a-9e3d-1b7f5a9c0e11",
       "Transparency": 0.38,
       "Blur": true,
@@ -621,7 +621,7 @@
       }
     },
     {
-      "Name": "Sakura Frost Night",
+      "Name": "Dusk Glass Dark",
       "Guid": "b5f2d8e3-3a7c-4d9b-8f4e-2c8a6b0d1f22",
       "Transparency": 0.42,
       "Blur": true,

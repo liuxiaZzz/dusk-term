@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Build the Sakura Term iTerm2 themes.
+"""Build the Dusk iTerm2 themes.
 
 Edit the palettes below, then run:  python3 build.py
 Outputs (committed to the repo, so users don't need to run this):
-  colors/Sakura Glass.itermcolors        dark
-  colors/Mist Sakura.itermcolors         light
-  colors/Sakura Frost.itermcolors        light glass
-  colors/Sakura Frost Night.itermcolors  dark glass
-  iterm/sakura-term.json              iTerm2 Dynamic Profiles (colors + transparency + font)
+  colors/Dusk Dark.itermcolors        dark
+  colors/Dusk Light.itermcolors         light
+  colors/Dusk Glass Light.itermcolors        light glass
+  colors/Dusk Glass Dark.itermcolors  dark glass
+  iterm/dusk.json              iTerm2 Dynamic Profiles (colors + transparency + font)
 """
 import json
 import os
@@ -15,8 +15,8 @@ import plistlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# ── Sakura Glass: dark, translucent, sapphire navy + sakura pink ──
-SAKURA_GLASS = {
+# ── Dusk Dark: dark, translucent, sapphire navy + pink ──
+DUSK_DARK = {
     "Background Color":    "#0b1734",
     "Foreground Color":    "#f2f5ff",
     "Bold Color":          "#ff9fd6",
@@ -30,7 +30,7 @@ SAKURA_GLASS = {
     "Tab Color":           "#0b1734",
     "Ansi 0 Color":  "#1a2a52", "Ansi 8 Color":  "#5f7099",
     "Ansi 1 Color":  "#ff5c8a", "Ansi 9 Color":  "#ff7fa6",
-    "Ansi 2 Color":  "#ffa6cf", "Ansi 10 Color": "#ffc4e1",   # "green" slot is sakura pink
+    "Ansi 2 Color":  "#ffa6cf", "Ansi 10 Color": "#ffc4e1",   # "green" slot is pink
     "Ansi 3 Color":  "#ffd4a3", "Ansi 11 Color": "#ffe3c2",
     "Ansi 4 Color":  "#7aa2ff", "Ansi 12 Color": "#9ebcff",
     "Ansi 5 Color":  "#ff8fd0", "Ansi 13 Color": "#ffb3e0",
@@ -38,9 +38,9 @@ SAKURA_GLASS = {
     "Ansi 7 Color":  "#dde3f5", "Ansi 15 Color": "#ffffff",
 }
 
-# ── Mist Sakura: light, misty pink-grey + ink blue ──
+# ── Dusk Light: light, misty pink-grey + ink blue ──
 # Light-theme convention: ANSI 0 is light and 7/15 are dark, so "white" text stays readable.
-MIST_SAKURA = {
+DUSK_LIGHT = {
     "Background Color":    "#e8e4e8",
     "Foreground Color":    "#363950",
     "Bold Color":          "#2a2d45",
@@ -54,7 +54,7 @@ MIST_SAKURA = {
     "Tab Color":           "#e8e4e8",
     "Ansi 0 Color":  "#dbd4da", "Ansi 8 Color":  "#9a98ad",
     "Ansi 1 Color":  "#c4566e", "Ansi 9 Color":  "#d46a82",
-    "Ansi 2 Color":  "#c9628f", "Ansi 10 Color": "#d77ea3",   # "green" slot is sakura pink
+    "Ansi 2 Color":  "#c9628f", "Ansi 10 Color": "#d77ea3",   # "green" slot is pink
     "Ansi 3 Color":  "#c08a4a", "Ansi 11 Color": "#cf9a5c",
     "Ansi 4 Color":  "#4f6fb3", "Ansi 12 Color": "#6a87c4",
     "Ansi 5 Color":  "#d07aa6", "Ansi 13 Color": "#dc8fb6",
@@ -62,8 +62,8 @@ MIST_SAKURA = {
     "Ansi 7 Color":  "#4a4d66", "Ansi 15 Color": "#3a3d55",
 }
 
-# ── Sakura Frost: light frosted glass (iOS-like): cool white, ink text, sakura accents ──
-SAKURA_FROST = {
+# ── Dusk Glass Light: light frosted glass (iOS-like): cool white, ink text, pink accents ──
+DUSK_GLASS_LIGHT = {
     "Background Color":    "#f3f4fa",
     "Foreground Color":    "#1f2440",
     "Bold Color":          "#141833",
@@ -85,8 +85,8 @@ SAKURA_FROST = {
     "Ansi 7 Color":  "#3a3f5c", "Ansi 15 Color": "#1f2440",
 }
 
-# ── Sakura Frost Night: dark frosted glass, deep sapphire smoke ──
-SAKURA_FROST_NIGHT = {
+# ── Dusk Glass Dark: dark frosted glass, deep sapphire smoke ──
+DUSK_GLASS_DARK = {
     "Background Color":    "#0f1730",
     "Foreground Color":    "#f4f6ff",
     "Bold Color":          "#ffb3dc",
@@ -133,10 +133,10 @@ COMMON = {
 }
 
 PROFILES = [
-    ("Sakura Glass", "6f1c9e2a-5b7d-4c1e-9a3f-5a4b7c9e2d01", SAKURA_GLASS, {"Blur Radius": 24}),
-    ("Mist Sakura",  "3d7a1c52-8e4b-4f0a-b6d2-0d1a7e5c9f02", MIST_SAKURA,  {"Blur Radius": 16}),
-    ("Sakura Frost", "a4e1c7d2-2f6b-4c8a-9e3d-1b7f5a9c0e11", SAKURA_FROST, {**GLASS, "Transparency": 0.38}),
-    ("Sakura Frost Night", "b5f2d8e3-3a7c-4d9b-8f4e-2c8a6b0d1f22", SAKURA_FROST_NIGHT, {**GLASS, "Transparency": 0.42}),
+    ("Dusk Dark", "6f1c9e2a-5b7d-4c1e-9a3f-5a4b7c9e2d01", DUSK_DARK, {"Blur Radius": 24}),
+    ("Dusk Light",  "3d7a1c52-8e4b-4f0a-b6d2-0d1a7e5c9f02", DUSK_LIGHT,  {"Blur Radius": 16}),
+    ("Dusk Glass Light", "a4e1c7d2-2f6b-4c8a-9e3d-1b7f5a9c0e11", DUSK_GLASS_LIGHT, {**GLASS, "Transparency": 0.38}),
+    ("Dusk Glass Dark", "b5f2d8e3-3a7c-4d9b-8f4e-2c8a6b0d1f22", DUSK_GLASS_DARK, {**GLASS, "Transparency": 0.42}),
 ]
 
 
@@ -160,9 +160,9 @@ def main():
         with open(os.path.join(HERE, "colors", f"{name}.itermcolors"), "wb") as f:
             plistlib.dump(cols, f)
         profiles.append({"Name": name, "Guid": guid, **COMMON, **extra, **cols})
-    with open(os.path.join(HERE, "iterm", "sakura-term.json"), "w") as f:
+    with open(os.path.join(HERE, "iterm", "dusk.json"), "w") as f:
         json.dump({"Profiles": profiles}, f, indent=2)
-    print("built colors/*.itermcolors and iterm/sakura-term.json")
+    print("built colors/*.itermcolors and iterm/dusk.json")
 
 
 if __name__ == "__main__":
