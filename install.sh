@@ -6,6 +6,11 @@
 #                                               Linux → server (trz/tsz for file transfer)
 #   ./install.sh --role local|server          override the detected role
 #   ./install.sh --modules theme,tools        pick modules (shell, theme, tools, remote)
+#   ./install.sh --style classic|glass        classic: Mist Sakura + Sakura Glass (5% see-through)
+#                                             glass:   Sakura Frost + Sakura Frost Night (frosted glass)
+#   ./install.sh --mode split|dark|light      split: light locally, dark on remote hosts (auto switch)
+#                                             dark / light: one look everywhere
+#   ./install.sh -y                           no questions, use defaults (classic, split)
 #   ./install.sh --tmux-host me@server        enable `st` (tmux on that host via iTerm2)
 #   ./install.sh --no-deps                    don't download anything (oh-my-zsh, fzf, ...)
 #   ./install.sh --themes-only                only the iTerm2 profiles (macOS)
@@ -28,6 +33,9 @@ ROLE=""
 TMUX_HOST=""
 DEPS=1
 THEMES_ONLY=0
+STYLE=""
+MODE=""
+ASK=1
 ARGS=("$@")
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -36,13 +44,18 @@ while [[ $# -gt 0 ]]; do
     --tmux-host)   TMUX_HOST="${2:?--tmux-host needs a value, e.g. me@server}"; shift 2 ;;
     --no-deps)     DEPS=0; shift ;;
     --themes-only) THEMES_ONLY=1; shift ;;
-    -h|--help)     sed -n '2,14p' "$0"; exit 0 ;;
+    --style)       STYLE="${2:?--style needs classic or glass}"; shift 2 ;;
+    --mode)        MODE="${2:?--mode needs split, dark or light}"; shift 2 ;;
+    -y|--yes)      ASK=0; shift ;;
+    -h|--help)     sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
 done
 has_mod() { [[ ",$MODULES," == *",$1,"* ]]; }
 [[ -n $ROLE ]] || ROLE=$([[ $OS == Darwin ]] && echo local || echo server)
 [[ $ROLE == local || $ROLE == server ]] || { echo "--role must be local or server" >&2; exit 1; }
+[[ -z $STYLE || $STYLE == classic || $STYLE == glass ]] || { echo "--style must be classic or glass" >&2; exit 1; }
+[[ -z $MODE || $MODE == split || $MODE == dark || $MODE == light ]] || { echo "--mode must be split, dark or light" >&2; exit 1; }
 for m in ${MODULES//,/ }; do
   [[ $m =~ ^(shell|theme|tools|remote)$ ]] || { echo "unknown module: $m (use shell, theme, tools, remote)" >&2; exit 1; }
 done
@@ -139,14 +152,86 @@ printf '  %s ✻ Sakura Term %s %s · %s %s %s %s\n' \
   "$BG_PINK$WHITE$BOLD" "$N$BG_SAPPHIRE$WHITE" "$role_name" "$os_name" "$N$BG_NAVY$BLUSH" "${MODULES//,/ · }" "$N"
 printf '  %s%s%s\n' "$MUTE" "$(t '蓝粉终端套件 · 主题、shell 环境与快捷命令' 'blue & pink terminal kit · themes, shell and shortcuts')" "$N"
 
+# ─── choices: style and local/remote look (local machine with themes only) ──
+# choose <title> <default> "label|description" ...   → REPLY = 1-based choice
+choose() {
+  local title=$1 def=$2; shift 2
+  local i=1 o lab
+  printf '\n  %s ? %s %s%s%s\n' "$BG_SAPPHIRE$WHITE$BOLD" "$N" "$BLUE$BOLD" "$title" "$N"
+  for o in "$@"; do
+    lab=${o%%|*}
+    if (( i == def )); then printf '     %s%s%s  %s%s%s  %s%s%s\n' "$PINK$BOLD" "$i" "$N" "$BOLD" "$(pad "$lab" 6)" "$N" "$MUTE" "${o#*|}" "$N"
+    else                   printf '     %s%s%s  %s  %s%s%s\n' "$BLUE" "$i" "$N" "$(pad "$lab" 6)" "$MUTE" "${o#*|}" "$N"; fi
+    i=$((i + 1))
+  done
+  local ans
+  while :; do
+    printf '     %s❯%s %s' "$PINK" "$N" "$(t "输入 1-${#}，回车选 ${def}：" "Pick 1-${#} (Enter = ${def}): ")"
+    IFS= read -r ans </dev/tty || ans=""
+    [[ -z $ans ]] && ans=$def
+    [[ $ans =~ ^[0-9]+$ ]] && (( ans >= 1 && ans <= $# )) && break
+  done
+  REPLY=$ans
+}
+WANT_THEME=0; [[ $OS == Darwin && $ROLE == local ]] && { has_mod theme || (( THEMES_ONLY )); } && WANT_THEME=1
+CAN_ASK=0; (( ASK && TTY )) && [[ -r /dev/tty ]] && CAN_ASK=1
+if (( WANT_THEME )); then
+  if [[ -z $STYLE ]]; then
+    STYLE=classic
+    if (( CAN_ASK )); then
+      choose "$(t 选择风格 'Pick a style')" 1 \
+        "$(t 经典 Classic)|$(t '雾白樱 + Sakura Glass，5% 透明' 'Mist Sakura + Sakura Glass, 5% see-through')" \
+        "$(t 玻璃 Glass)|$(t 'Sakura Frost + Frost Night，毛玻璃' 'Sakura Frost + Frost Night, frosted glass')"
+      (( REPLY == 2 )) && STYLE=glass
+    fi
+  fi
+  if [[ -z $MODE ]]; then
+    MODE=split
+    if (( CAN_ASK )); then
+      choose "$(t '本机和远程' 'Local and remote')" 1 \
+        "$(t 分开 Split)|$(t '本机浅色，ssh 到服务器自动换深色' 'light here, dark automatically on ssh')" \
+        "$(t 全深色 Dark)|$(t '到处都用深色' 'dark everywhere')" \
+        "$(t 全浅色 Light)|$(t '到处都用浅色' 'light everywhere')"
+      case $REPLY in 2) MODE=dark ;; 3) MODE=light ;; esac
+    fi
+  fi
+fi
+STYLE=${STYLE:-classic}; MODE=${MODE:-split}
+if [[ $STYLE == glass ]]; then LIGHT_P="Sakura Frost"; DARK_P="Sakura Frost Night"
+else                          LIGHT_P="Mist Sakura";  DARK_P="Sakura Glass"; fi
+case $MODE in
+  split) LOCAL_P=$LIGHT_P; REMOTE_P=$DARK_P; AUTO=1 ;;
+  dark)  LOCAL_P=$DARK_P;  REMOTE_P=$DARK_P; AUTO=0 ;;
+  light) LOCAL_P=$LIGHT_P; REMOTE_P=$LIGHT_P; AUTO=0 ;;
+esac
+# remember the answers so `sakura update` doesn't ask again
+[[ " ${ARGS[*]-} " == *" --style "* ]] || ARGS+=(--style "$STYLE")
+[[ " ${ARGS[*]-} " == *" --mode "*  ]] || ARGS+=(--mode "$MODE")
+
+# command names other tools already define (GCR, your aliases): sakura-term will leave them alone
+OUR_NAMES="del|rm|delf|empty_trash|gita|gitaa|gitb|gitst|gitl|gitr|gitpl|gitps|gitc|gitch|sz|szn|pid|port|pathadd|mychmod|mychown|cl|sc|listen|upload|download|dps|dsh|dlog|dockeradd"
+TAKEN=""
+if [[ -f $ZSHRC ]]; then
+  rcfiles=("$ZSHRC")
+  while IFS= read -r f; do
+    f="${f/#\~/$HOME}"; f="${f//\$HOME/$HOME}"; f="${f//\"/}"
+    [[ -f $f && $f != "$CONF_DIR"* ]] && rcfiles+=("$f")
+  done < <(sed -nE 's/^[[:space:]]*(source|\.)[[:space:]]+([^;&|[:space:]]+).*/\2/p' "$ZSHRC")
+  TAKEN="$(cat "${rcfiles[@]}" 2>/dev/null \
+    | sed -nE "s/^[[:space:]]*(alias[[:space:]]+|function[[:space:]]+)?($OUR_NAMES)(=|[[:space:]]*\(\)|[[:space:]]*\{).*/\2/p" \
+    | sort -u | tr '\n' ' ')"
+fi
+
 # ─── 1. iTerm2 profiles (macOS) ──────────────────────────────────────────────
 if [[ $OS == Darwin && $ROLE == local ]] && { has_mod theme || (( THEMES_ONLY )); }; then
   step "$(t 主题 Themes)"
   mkdir -p "$ITERM_DIR"
   cp "$REPO_DIR/iterm/sakura-term.json" "$ITERM_DIR/sakura-term.json"
-  ok "$(t 'iTerm2 配置文件' 'iTerm2 profiles')" "Mist Sakura · Sakura Glass"
+  ok "$(t 'iTerm2 配置文件' 'iTerm2 profiles')" "Mist Sakura · Sakura Glass · Sakura Frost · Frost Night"
+  if [[ $MODE == split ]]; then ok "$(t '本机 / 远程' 'local / remote')" "$LOCAL_P → $REMOTE_P"
+  else ok "$(t '统一配色' 'one look')" "$LOCAL_P"; fi
   [[ -d /Applications/iTerm.app ]] || warn "$(t '没找到 iTerm2，可在 https://iterm2.com 下载' 'iTerm2 not found — get it at https://iterm2.com')"
-  NOTES+=("$(t '把 Mist Sakura 设为默认：' 'Make Mist Sakura the default:')|iTerm2 → Settings → Profiles → Other Actions…")
+  NOTES+=("$(t "把 $LOCAL_P 设为默认：" "Make $LOCAL_P the default:")|iTerm2 → Settings → Profiles → Other Actions…")
 fi
 if (( THEMES_ONLY )); then
   [[ $OS == Darwin ]] || warn "$(t '--themes-only 只装 iTerm2 主题，仅限 macOS' '--themes-only installs iTerm2 profiles, which are macOS-only')"
@@ -245,9 +330,16 @@ fi
   echo "typeset -g  SAKURA_REPO=\"$REPO_DIR\""
   printf 'typeset -g  SAKURA_INSTALL_ARGS=%q\n' "${ARGS[*]-}"
   echo "typeset -g  SAKURA_P10K_LAYOUT=$P10K_LAYOUT"
+  echo ": \${SAKURA_LOCAL_PROFILE:=\"$LOCAL_P\"}"
+  echo ": \${SAKURA_REMOTE_PROFILE:=\"$REMOTE_P\"}"
+  echo ": \${SAKURA_AUTO_SWITCH:=$AUTO}"
   if [[ -n $TMUX_HOST ]]; then echo ": \${SAKURA_TMUX_HOST:=\"$TMUX_HOST\"}"; fi
 } > "$CONF_DIR/config.zsh"
 ok "$(t 'zsh 模块' 'zsh modules')" "$(short "$CONF_DIR")"
+if [[ -n $TAKEN ]] && { has_mod tools || has_mod remote; }; then
+  skip "$(t '保留你已有的命令' 'keeping your commands')" "$TAKEN"
+  NOTES+=("$(t '这些命令保留了你原来的版本：' 'These kept your existing version:')|$TAKEN")
+fi
 
 touch "$ZSHRC"
 cp "$ZSHRC" "$ZSHRC.bak-sakura-term"

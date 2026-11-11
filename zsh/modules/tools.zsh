@@ -11,7 +11,7 @@ _sk_trash_dir() {
 }
 
 # del <file>...   flags like -r -f -i are accepted and ignored (everything goes to the trash)
-del() {
+_sk_del() {
   local -a files; local a seen_dd=0
   for a in "$@"; do
     if (( seen_dd )) || [[ $a != -* ]]; then files+=("$a")
@@ -54,7 +54,7 @@ del() {
   return $missing
 }
 
-empty_trash() {
+_sk_empty_trash() {
   local dir=$(_sk_trash_dir)
   _sk_ask "永久清空回收站 $dir ？" || return 1
   if [[ $OSTYPE == darwin* ]]; then
@@ -66,28 +66,30 @@ empty_trash() {
   fi
 }
 
+_sk_bind del _sk_del
+_sk_bind empty_trash _sk_empty_trash
 if (( SAKURA_SAFE_RM )); then
-  alias rm=del
-  alias delf='command rm -rf'
+  _sk_bind rm _sk_del
+  _sk_bind delf 'command rm -rf'
 fi
 
 # ─── git shortcuts ───────────────────────────────────────────────────────────
-alias gita='git add'
-alias gitaa='git add .'
-alias gitb='git branch'
-alias gitst='git status -sb'
-alias gitl='git log --oneline --graph --decorate -20'
-alias gitr='git reset'
-alias gitpl='git pull'
-alias gitps='git push origin HEAD'          # push the current branch
+_sk_bind gita  'git add'
+_sk_bind gitaa 'git add .'
+_sk_bind gitb  'git branch'
+_sk_bind gitst 'git status -sb'
+_sk_bind gitl  'git log --oneline --graph --decorate -20'
+_sk_bind gitr  'git reset'
+_sk_bind gitpl 'git pull'
+_sk_bind gitps 'git push origin HEAD'       # push the current branch
 
-gitc() {                                    # gitc fix typo   /   gitc  (asks)
+_sk_gitc() {                                    # gitc fix typo   /   gitc  (asks)
   local msg="$*"
   [[ -n $msg ]] || read -r "msg?提交说明: "
   [[ -n $msg ]] && git commit -m "$msg"
 }
 
-gitch() {                                   # gitch dev   /   gitch  (pick a branch)
+_sk_gitch() {                                   # gitch dev   /   gitch  (pick a branch)
   if [[ -n $1 ]]; then git checkout "$1"; return; fi
   local b
   if (( $+commands[fzf] )); then
@@ -99,20 +101,20 @@ gitch() {                                   # gitch dev   /   gitch  (pick a bra
 }
 
 # ─── sizes ───────────────────────────────────────────────────────────────────
-sz() {                                      # sz  →  disks   |   sz <path> [depth]
+_sk_sz() {                                      # sz  →  disks   |   sz <path> [depth]
   if [[ -z $1 ]]; then
     df -h | awk 'NR==1 || $1 ~ "^/dev/"'
   else
     du -h -d ${2:-0} -- "$1" 2>/dev/null | sort -h
   fi
 }
-szn() {                                     # number of files under a folder
+_sk_szn() {                                     # number of files under a folder
   local d=${1:-.}
   print "$(find -- "$d" -type f 2>/dev/null | wc -l | tr -d ' ') files in $d"
 }
 
 # ─── processes and ports ─────────────────────────────────────────────────────
-pid() {                                     # pid python   /   pid  (GPU processes)
+_sk_pid() {                                     # pid python   /   pid  (GPU processes)
   if [[ -n $1 ]]; then
     ps -eo pid,user,%cpu,%mem,etime,command | awk -v q="$1" 'NR==1 || (tolower($0) ~ tolower(q) && $0 !~ / awk -v q=/)' \
       | cut -c1-${COLUMNS:-160}
@@ -123,7 +125,7 @@ pid() {                                     # pid python   /   pid  (GPU process
   fi
 }
 
-port() {                                    # port 8080
+_sk_port() {                                    # port 8080
   [[ -n $1 ]] || { print "用法: port <端口号>"; return 1 }
   if (( $+commands[lsof] )); then
     lsof -nP -iTCP:$1 -sTCP:LISTEN 2>/dev/null || print "没有进程在监听 $1"
@@ -133,7 +135,7 @@ port() {                                    # port 8080
 }
 
 # ─── PATH and permissions ────────────────────────────────────────────────────
-pathadd() {                                 # pathadd ~/bin   /   pathadd ~/bin -s  (save to ~/.zshrc)
+_sk_pathadd() {                                 # pathadd ~/bin   /   pathadd ~/bin -s  (save to ~/.zshrc)
   [[ -n $1 ]] || { print "用法: pathadd <目录> [-s]"; return 1 }
   local d=${1:A}
   [[ -d $d ]] || { print "目录不存在: $d"; return 1 }
@@ -154,10 +156,14 @@ _sk_recursive() {                           # _sk_recursive chmod|chown <dir> <v
   if [[ -w $dir && $cmd == chmod ]]; then command $cmd -R $val -- $dir
   else sudo $cmd -R $val -- $dir; fi
 }
-mychmod() { _sk_recursive chmod "$1" "$2" }  # mychmod ./data 755
-mychown() { _sk_recursive chown "$1" "$2" }  # mychown ./data me:staff
+_sk_mychmod() { _sk_recursive chmod "$1" "$2" }  # mychmod ./data 755
+_sk_mychown() { _sk_recursive chown "$1" "$2" }  # mychown ./data me:staff
+
+for _sk_n in gitc gitch sz szn pid port pathadd mychmod mychown; do _sk_bind $_sk_n _sk_$_sk_n; done
+unset _sk_n
 
 # ─── listing and small things ────────────────────────────────────────────────
+# cosmetic: with eza installed take over the ls family; otherwise only fill in missing ones, quietly
 if (( $+commands[eza] )); then
   alias ls='eza --group-directories-first'
   alias ll='eza -la --git --group-directories-first'
@@ -165,10 +171,7 @@ if (( $+commands[eza] )); then
   alias l='eza --group-directories-first'
   alias tree='eza --tree'
 else
-  if [[ $OSTYPE == darwin* ]]; then alias ls='ls -G'; else alias ls='ls --color=auto'; fi
-  alias ll='ls -alFh'
-  alias la='ls -A'
-  alias l='ls -CF'
+  _sk_bind ll 'ls -alFh' quiet; _sk_bind la 'ls -A' quiet; _sk_bind l 'ls -CF' quiet
 fi
-alias cl='clear'
-alias sc='source ${ZDOTDIR:-$HOME}/.zshrc'
+_sk_bind cl 'clear'
+_sk_bind sc 'source ${ZDOTDIR:-$HOME}/.zshrc'

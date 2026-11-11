@@ -41,6 +41,11 @@ _sakura_help() {
     print "    j <关键词>          跳到常去的目录（zoxide）    Ctrl-R / Ctrl-T  fzf 搜索历史 / 文件"
     print "    x <压缩包>          解压任意格式               Esc Esc  给上一条命令加 sudo"
   fi
+  if (( $#SAKURA_SKIPPED )); then
+    print
+    _sk_dim "  已被其他工具占用、保留原样：${SAKURA_SKIPPED[*]}"
+    _sk_dim "  想改用 sakura 的版本：在 ~/.zshrc 的 sakura-term 区块前加 SAKURA_OVERRIDE=1"
+  fi
   print
   _sk_dim "  sakura / hud  控制中心    sakura help  本帮助    sakura update  更新    sakura doctor  检查依赖"
 }
@@ -62,6 +67,7 @@ _sakura_doctor() {
   if [[ $OSTYPE == darwin* ]]; then
     print -P "  $( ls ~/Library/Fonts /Library/Fonts 2>/dev/null | grep -qi nerdfont && echo $ok || echo $no ) Nerd Font（图标需要）"
   fi
+  (( $#SAKURA_SKIPPED )) && print -P "  %F{8}·%f 让给其他工具的命令：${SAKURA_SKIPPED[*]}"
 }
 
 sakura() {

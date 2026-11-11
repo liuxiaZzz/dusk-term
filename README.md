@@ -13,9 +13,24 @@ git clone https://github.com/liuxiaZzz/sakura-term.git ~/.sakura-term
 ~/.sakura-term/install.sh
 ```
 
-装完新开一个终端（或 `exec zsh`），输入 `sakura` 查看所有快捷命令。
+安装时会问你两个问题（直接回车就是默认值）：
 
-macOS 上再做一步：iTerm2 → **Settings → Profiles** → 选 **Mist Sakura** → **Other Actions… → Set as Default**。
+| 问题 | 选项 |
+|---|---|
+| 风格 | **经典**：Mist Sakura + Sakura Glass，5% 透明 · **玻璃**：Sakura Frost + Frost Night，毛玻璃 |
+| 本机和远程 | **分开**：本机浅色，ssh 到服务器自动换深色 · **全深色** · **全浅色** |
+
+也可以直接用参数跳过提问：`--style classic|glass`、`--mode split|dark|light`，或 `-y` 全用默认。
+
+装完新开一个终端（或 `exec zsh`），输入 `hud` 打开控制中心，`sakura help` 查看所有快捷命令。
+
+macOS 上再做一步：iTerm2 → **Settings → Profiles** → 选安装结束时提示的配置文件 → **Other Actions… → Set as Default**。
+
+### 和 GCR 或你自己的配置共存
+
+sakura-term 不会抢已经被占用的命令名：如果 GCR、oh-my-zsh 插件或你自己的 alias 已经定义了 `rm`、`pid`、`gitps` 等，就保留原来的版本，安装界面会列出这些名字，`sakura help` 里也能看到。想改用 sakura 的版本，在 `~/.zshrc` 的 sakura-term 区块前加一行 `SAKURA_OVERRIDE=1`。
+
+GCR 更新只会覆盖它自己的文件，sakura-term 放在 `~/.config/sakura-term`，互不影响。
 
 > 建议 clone 到 `~/.sakura-term`，以后 `sakura update` 就能一键更新。
 
@@ -54,8 +69,10 @@ macOS 上再做一步：iTerm2 → **Settings → Profiles** → 选 **Mist Saku
 
 | | |
 |---|---|
-| **Mist Sakura**（浅色） | 雾灰粉底 + 墨蓝字，粉色命令、蓝色目录。本地日常用。 |
-| **Sakura Glass**（深色） | 宝石蓝底 + 冷白字，樱粉点缀，5% 透明 + 毛玻璃。远程用。 |
+| **Mist Sakura**（浅色） | 雾灰粉底 + 墨蓝字，粉色命令、蓝色目录。 |
+| **Sakura Glass**（深色） | 宝石蓝底 + 冷白字，樱粉点缀，5% 透明。 |
+| **Sakura Frost**（浅色玻璃） | 冷白毛玻璃，约 38% 透明 + 强模糊，提示栏色块保持实心，像 iOS。 |
+| **Sakura Frost Night**（深色玻璃） | 深宝石蓝烟雾玻璃，约 42% 透明。 |
 
 - 敲 `ssh` / `tssh` / `mosh` 时窗口自动切成 Sakura Glass，退出后切回原来的主题（iTerm2）。
 - p10k 提示栏是六种低饱和蓝粉色块，Linux 上只要终端支持真彩色也一样。
@@ -132,7 +149,9 @@ macOS 上再做一步：iTerm2 → **Settings → Profiles** → 选 **Mist Saku
 |---|---|---|
 | `SAKURA_MODULES` | 安装时选的 | 例如 `SAKURA_MODULES=(theme tools)` |
 | `SAKURA_SAFE_RM` | `1` | `0` 让 `rm` 恢复原样 |
-| `SAKURA_REMOTE_PROFILE` | `Sakura Glass` | 远程时切到哪个 iTerm2 配置文件 |
+| `SAKURA_OVERRIDE` | `0` | `1` 让 sakura 的命令覆盖已被占用的同名命令 |
+| `SAKURA_LOCAL_PROFILE` | 安装时选的 | 退出远程后切回的配置文件 |
+| `SAKURA_REMOTE_PROFILE` | 安装时选的 | 远程时切到哪个 iTerm2 配置文件 |
 | `SAKURA_AUTO_SWITCH` | `1` | `0` 关闭远程自动切换 |
 | `SAKURA_P10K_COLORS` | `1` | `0` 保留你自己的 p10k 配色 |
 | `SAKURA_WELCOME` | `1` | 新标签页的控制中心：`1` 完整、`2` 精简、`0` 关闭 |

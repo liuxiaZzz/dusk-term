@@ -6,7 +6,7 @@
 #   listen R <host> <local_port> [remote_port]   expose a local service on the remote host
 #   listen D <host> <local_port>                 SOCKS5 proxy through <host>
 #   listen                                       interactive
-listen() {
+_sk_listen() {
   local mode=$1 host=$2 a=$3 b=$4
   if [[ -z $mode ]]; then
     print "  [L] 本地转发：在本机访问远程端口"
@@ -37,14 +37,16 @@ listen() {
   esac
 }
 
-# ─── trzsz: drag-and-drop upload / download over ssh ────────────────────────
-(( $+commands[tssh] )) && alias tssh='tssh --dragfile'
+_sk_bind listen _sk_listen
 
-upload() {                                  # run on the server: upload  /  upload -d (folder)
+# ─── trzsz: drag-and-drop upload / download over ssh ────────────────────────
+(( $+commands[tssh] )) && _sk_bind tssh 'tssh --dragfile'
+
+_sk_upload() {                                  # run on the server: upload  /  upload -d (folder)
   (( $+commands[trz] )) || { print "需要 trzsz（install.sh 的 remote 模块会安装）"; return 1 }
   if [[ $1 == -d ]]; then trz -d; else trz "$@"; fi
 }
-download() {                                # run on the server: download file...  /  download (pick)
+_sk_download() {                                # run on the server: download file...  /  download (pick)
   (( $+commands[tsz] )) || { print "需要 trzsz（install.sh 的 remote 模块会安装）"; return 1 }
   if (( $# )); then tsz -d "$@"; return; fi
   local f
@@ -53,18 +55,22 @@ download() {                                # run on the server: download file..
   [[ -n $f ]] && tsz -d "$f"
 }
 
+_sk_bind upload _sk_upload
+_sk_bind download _sk_download
+
 # ─── docker ──────────────────────────────────────────────────────────────────
 if (( $+commands[docker] )); then
-  alias dps='docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"'
-  dsh() {                                   # dsh web   /   dsh web zsh
+  _sk_bind dps 'docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"'
+  _sk_dsh() {                                   # dsh web   /   dsh web zsh
     [[ -n $1 ]] || { print "用法: dsh <容器> [shell]"; return 1 }
     if [[ -n $2 ]]; then docker exec -it "$1" "$2"
     else docker exec -it "$1" sh -c 'command -v bash >/dev/null && exec bash || exec sh'; fi
   }
-  dlog() { [[ -n $1 ]] || { print "用法: dlog <容器>"; return 1 }; docker logs -f --tail 200 "$1" }
-  dockeradd() {                             # Linux: let a user run docker without sudo
+  _sk_dlog() { [[ -n $1 ]] || { print "用法: dlog <容器>"; return 1 }; docker logs -f --tail 200 "$1" }
+  _sk_dockeradd() {                             # Linux: let a user run docker without sudo
     [[ $OSTYPE == linux* ]] || { print "只在 Linux 上需要（macOS 的 Docker Desktop 不用）"; return 0 }
     local u=${1:-$USER}
     sudo usermod -aG docker "$u" && print "已把 $u 加入 docker 组，重新登录后生效"
   }
+  _sk_bind dsh _sk_dsh; _sk_bind dlog _sk_dlog; _sk_bind dockeradd _sk_dockeradd
 fi
