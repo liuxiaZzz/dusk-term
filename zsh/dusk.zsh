@@ -9,6 +9,13 @@
 
 typeset -g DUSK_DIR=${${(%):-%x}:A:h}
 [[ -f $DUSK_DIR/config.zsh ]] && source $DUSK_DIR/config.zsh
+
+# Language: DUSK_LANG=zh|en, default from the system locale. Messages pick their text with
+# ${${DUSK_ZH:+中文}:-English} (no subshell, so it costs nothing).
+if [[ -z $DUSK_LANG ]]; then
+  [[ ${LC_ALL:-${LC_MESSAGES:-$LANG}} == zh* ]] && DUSK_LANG=zh || DUSK_LANG=en
+fi
+typeset -g DUSK_ZH=; [[ $DUSK_LANG == zh ]] && DUSK_ZH=1
 (( ${+DUSK_MODULES} )) || typeset -ga DUSK_MODULES=(shell theme tools remote)
 
 # Public command names are bound with _dk_bind, which leaves a name alone when another tool

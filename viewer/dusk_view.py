@@ -48,6 +48,7 @@ except Exception:
 WSI_EXT = {".svs", ".ndpi", ".mrxs", ".scn", ".vms", ".vmu", ".bif", ".svslide", ".tif", ".tiff", ".dcm", ".btf", ".tf2", ".tf8"}
 IMG_EXT = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff"}
 TILE, OVERLAP, QUALITY = 254, 2, 82
+BRAND = "Peek"
 
 
 # ─── image sources ───────────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ class PilSource:
     def __init__(self, path):
         img = Image.open(path)
         if img.size[0] * img.size[1] > 500_000_000:          # would need GBs of RAM and minutes
-            raise RuntimeError(f"{img.size[0]}×{img.size[1]} 太大，又不是金字塔格式，无法流畅浏览")
+            raise RuntimeError(f"{img.size[0]}×{img.size[1]} is too large for a non-pyramidal image to browse smoothly")
         img.load()
         self.full = img.convert("RGB")
         self.width, self.height = self.full.size
@@ -104,7 +105,7 @@ class SlideSource:
         self.slide = openslide.OpenSlide(path)
         w, h = self.slide.dimensions
         if self.slide.level_count == 1 and max(w, h) > 20000:
-            raise RuntimeError(f"{w}×{h} 但 OpenSlide 只看到 1 层（没有金字塔），这样缩放会极慢")
+            raise RuntimeError(f"{w}×{h} but OpenSlide sees a single level (no pyramid); zooming would be very slow")
         self.dz = DeepZoomGenerator(self.slide, tile_size=TILE, overlap=OVERLAP, limit_bounds=True)
         self.width, self.height = self.dz.level_dimensions[-1]
         self.max_level = self.dz.level_count - 1
@@ -294,8 +295,8 @@ def open_source(path):
         except Exception as e:
             errors.append(f"pillow: {e}")
     if ext in WSI_EXT - IMG_EXT and not openslide:
-        raise RuntimeError("需要 openslide 才能打开这种切片：pip install --user openslide-python openslide-bin")
-    raise RuntimeError("打不开这个文件" + (f"（{'; '.join(errors)}）" if errors else ""))
+        raise RuntimeError("this slide format needs openslide: pip install --user openslide-python openslide-bin")
+    raise RuntimeError("cannot open this file" + (f" ({'; '.join(errors)})" if errors else ""))
 
 
 def kind(name):
@@ -429,7 +430,8 @@ def make_handler(app):
             try:
                 if u.path == "/":
                     self.send(200, PAGE.replace("__START__", json.dumps(app.start))
-                              .replace("__HOST__", html.escape(app.host)), "text/html; charset=utf-8")
+                              .replace("__HOST__", html.escape(app.host))
+                              .replace("__BRAND__", html.escape(BRAND)), "text/html; charset=utf-8")
                 elif u.path == "/api/list":
                     self.send(200, json.dumps(app.listing(q.get("p", ""))), "application/json")
                 elif u.path == "/api/info":
@@ -459,8 +461,8 @@ def make_handler(app):
 
 # ─── the page: folder browser + deep-zoom viewer (OpenSeadragon) ────────────────────
 PAGE = r"""<!doctype html>
-<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dusk View · __HOST__</title>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>__BRAND__ · __HOST__</title>
 <script src="https://cdn.jsdelivr.net/npm/openseadragon@4.1.1/build/openseadragon/openseadragon.min.js"></script>
 <style>
 :root{--bg:#0f1730;--panel:#16204099;--line:#ffffff1a;--fg:#f4f6ff;--mute:#8f9bc4;--pink:#ff9fd2;--blue:#86abff;--card:#1c2a52}
@@ -495,18 +497,29 @@ width:38px;height:38px;font-size:16px;cursor:pointer}.btns button:hover{border-c
 #scalebar{height:6px;background:var(--pink);border-radius:3px;display:inline-block;vertical-align:middle;margin-right:6px}
 .err{color:#ff8fb0}
 </style></head><body>
-<header><span class="pill">Dusk View</span><span class="host">__HOST__</span><div class="crumbs" id="crumbs"></div>
-<input id="filter" placeholder="筛选文件名…" autocomplete="off"></header>
+<header><span class="pill">__BRAND__</span><span class="host">__HOST__</span><div class="crumbs" id="crumbs"></div>
+<input id="filter" data-ph="filter" autocomplete="off"></header>
 <main id="browser"><div class="grid" id="grid"></div></main>
 <div id="viewer"><div id="osd"></div></div>
 <div class="hud" id="hud"><span class="chip" id="title"></span><span class="chip" id="dims"></span>
 <span class="chip" id="zoom"></span><span class="chip" id="scale"><span id="scalebar"></span><span id="scaletext"></span></span></div>
-<div class="btns" id="btns"><button title="返回文件夹 (Esc)" onclick="back()">←</button>
-<button title="上一张 (←)" onclick="step(-1)">‹</button><button title="下一张 (→)" onclick="step(1)">›</button>
-<button title="适应窗口 (0)" onclick="osd&&osd.viewport.goHome()">⤢</button>
-<button title="全屏 (f)" onclick="toggleFull()">⛶</button></div>
+<div class="btns" id="btns"><button data-tip="back" onclick="back()">←</button>
+<button data-tip="prev" onclick="step(-1)">‹</button><button data-tip="next" onclick="step(1)">›</button>
+<button data-tip="fit" onclick="osd&&osd.viewport.goHome()">⤢</button>
+<button data-tip="full" onclick="toggleFull()">⛶</button></div>
 <script>
 const START = __START__;
+// UI language follows the browser: Chinese for zh-*, English otherwise
+const ZH = (navigator.language || "").toLowerCase().startsWith("zh");
+const T = ZH ? {root:"根目录", empty:"这里没有图片或子文件夹", folder:"文件夹", slide:"切片 · ", loading:"载入中…", levels:" 层",
+  zoom:"缩放", newtab:"⌘+点击：在新标签页打开", filter:"筛选文件名…", back:"返回文件夹 (Esc)", prev:"上一张 (←)", next:"下一张 (→)",
+  fit:"适应窗口 (0)", full:"全屏 (f)"}
+ : {root:"Home", empty:"No images or folders here", folder:"Folder", slide:"Slide · ", loading:"Loading…", levels:" levels",
+  zoom:"Zoom", newtab:"⌘-click: open in a new tab", filter:"Filter by name…", back:"Back to folder (Esc)", prev:"Previous (←)",
+  next:"Next (→)", fit:"Fit to window (0)", full:"Full screen (f)"};
+document.documentElement.lang = ZH ? "zh" : "en";
+document.querySelectorAll("[data-tip]").forEach(b => b.title = T[b.dataset.tip]);
+document.querySelectorAll("[data-ph]").forEach(i => i.placeholder = T[i.dataset.ph]);
 let dir = "", entries = [], images = [], osd = null, current = null, mpp = null;
 const $ = id => document.getElementById(id);
 const enc = encodeURIComponent;
@@ -515,7 +528,7 @@ const join = (a, b) => a ? a + "/" + b : b;
 
 function crumbs(path, file) {
   const parts = path ? path.split("/") : [];
-  let html = `<a href="#">根目录</a>`, acc = "";
+  let html = `<a href="#">${T.root}</a>`, acc = "";
   for (const p of parts) { acc = join(acc, p); html += `<span>/</span><a href="#${enc(acc)}">${esc(p)}</a>`; }
   if (file) html += `<span>/</span><span style="color:var(--fg)">${esc(file)}</span>`;
   $("crumbs").innerHTML = html;
@@ -539,13 +552,13 @@ window.addEventListener("hashchange", route);
 function render() {
   const f = $("filter").value.toLowerCase();
   const list = entries.filter(e => !f || e.name.toLowerCase().includes(f));
-  if (!list.length) { $("grid").innerHTML = `<div class="empty">这里没有图片或子文件夹</div>`; return; }
+  if (!list.length) { $("grid").innerHTML = `<div class="empty">${T.empty}</div>`; return; }
   $("grid").innerHTML = list.map(e => {
     const p = join(dir, e.name);
     if (e.type === "dir") return `<a class="card" href="#${enc(p)}"><div class="thumb"><span class="icon">📁</span></div>
-      <div class="meta"><div class="name">${esc(e.name)}</div><div class="sub">文件夹</div></div></a>`;
-    return `<a class="card" href="#${enc(p)}" title="⌘+点击：在新标签页打开"><div class="thumb"><img loading="lazy" src="/api/thumb?p=${enc(p)}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'icon',textContent:'🖼'}))"></div>
-      <div class="meta"><div class="name">${esc(e.name)}</div><div class="sub">${e.type === "slide" ? "切片 · " : ""}${fmt(e.size)}</div></div></a>`;
+      <div class="meta"><div class="name">${esc(e.name)}</div><div class="sub">${T.folder}</div></div></a>`;
+    return `<a class="card" href="#${enc(p)}" title="${T.newtab}"><div class="thumb"><img loading="lazy" src="/api/thumb?p=${enc(p)}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'icon',textContent:'🖼'}))"></div>
+      <div class="meta"><div class="name">${esc(e.name)}</div><div class="sub">${e.type === "slide" ? T.slide : ""}${fmt(e.size)}</div></div></a>`;
   }).join("");
 }
 $("filter").addEventListener("input", render);
@@ -558,14 +571,14 @@ async function showImage(name) {
   const p = join(dir, name); current = name;
   $("browser").style.display = "none"; $("viewer").style.display = "block"; $("filter").style.display = "none";
   $("hud").style.display = "flex"; $("btns").style.display = "flex"; crumbs(dir, name);
-  $("title").innerHTML = `<b>${esc(name)}</b>`; $("dims").textContent = "载入中…"; $("zoom").textContent = ""; $("scale").style.display = "none";
+  $("title").innerHTML = `<b>${esc(name)}</b>`; $("dims").textContent = T.loading; $("zoom").textContent = ""; $("scale").style.display = "none";
   const r = await fetch("/api/info?p=" + enc(p)); const info = await r.json();
   if (info.error) { $("dims").innerHTML = `<span class="err">${esc(info.error)}</span>`; if (osd) osd.close(); return; }
   const pr = info.props || {};
   mpp = pr.mpp_x ? parseFloat(pr.mpp_x) : null;
   $("dims").textContent = `${info.width.toLocaleString()} × ${info.height.toLocaleString()} px` +
     (pr.objective ? ` · ${pr.objective}×` : "") + (mpp ? ` · ${mpp.toFixed(3)} µm/px` : "") + (pr.vendor ? ` · ${pr.vendor}` : "") +
-    (pr.format && pr.format !== "PNG" && pr.format !== "JPEG" ? ` · ${pr.format}${pr.levels ? " " + pr.levels + " 层" : ""}` : "");
+    (pr.format && pr.format !== "PNG" && pr.format !== "JPEG" ? ` · ${pr.format}${pr.levels ? " " + pr.levels + T.levels : ""}` : "");
   const source = { width: info.width, height: info.height, tileSize: info.tileSize, tileOverlap: info.overlap,
     minLevel: 0, maxLevel: info.maxLevel, getTileUrl: (l, x, y) => `/api/tile?p=${enc(p)}&l=${l}&x=${x}&y=${y}` };
   if (!osd) {
@@ -582,7 +595,7 @@ function hud() {
   if (!osd || !osd.world.getItemAt(0)) return;
   const item = osd.world.getItemAt(0);
   const z = item.viewportToImageZoom(osd.viewport.getZoom(true));       // screen px per image px
-  $("zoom").textContent = `缩放 ${(z * 100).toFixed(z < 0.1 ? 1 : 0)}%`;
+  $("zoom").textContent = `${T.zoom} ${(z * 100).toFixed(z < 0.1 ? 1 : 0)}%`;
   if (mpp) {
     const umPerScreenPx = mpp / z, target = 120 * umPerScreenPx;
     const nice = [1,2,5,10,20,50,100,200,500,1000,2000,5000,10000].find(v => v >= target * 0.5) || target;
@@ -612,13 +625,16 @@ def main():
     ap = argparse.ArgumentParser(description="Dusk View tile server")
     ap.add_argument("--path", default=".")
     ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--brand", default="Peek", help="name shown in the page header")
     a = ap.parse_args()
+    global BRAND
+    BRAND = a.brand
     if Image is None:
         print("DUSK_VIEW_MISSING pillow", flush=True)
         sys.exit(3)
     path = os.path.abspath(os.path.expanduser(a.path))
     if not os.path.exists(path):
-        print(f"DUSK_VIEW_ERROR 没有这个文件或文件夹：{path}", flush=True)
+        print(f"DUSK_VIEW_ERROR no such file or folder: {path}", flush=True)
         sys.exit(2)
     app = App(path)
     try:
@@ -627,7 +643,7 @@ def main():
             daemon_threads = True
         srv = Server(("127.0.0.1", a.port), make_handler(app))
     except OSError as e:
-        print(f"DUSK_VIEW_ERROR 端口 {a.port} 用不了：{e}", flush=True)
+        print(f"DUSK_VIEW_ERROR port {a.port} is not available: {e}", flush=True)
         sys.exit(4)
     note = "" if (openslide or tifffile) else " (no openslide/tifffile: whole-slide formats need them)"
     threading.Thread(target=watchdog, daemon=True).start()

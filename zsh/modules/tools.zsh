@@ -17,11 +17,11 @@ _dk_del() {
     if (( seen_dd )) || [[ $a != -* ]]; then files+=("$a")
     elif [[ $a == -- ]]; then seen_dd=1; fi
   done
-  (( $#files )) || { print "用法: del <文件或目录>...   （移到回收站，可恢复）"; return 1 }
+  (( $#files )) || { print "${${DUSK_ZH:+用法: del <文件或目录>...   （移到回收站，可恢复）}:-usage: del <file or folder>...   (moves to the trash, recoverable)}"; return 1 }
 
   local f missing=0; local -a existing
   for f in "${files[@]}"; do         # plain test, no globbing: a file named '*' stays just that file
-    if [[ -e $f || -L $f ]]; then existing+=("$f"); else print -u2 "del: 不存在: $f"; missing=1; fi
+    if [[ -e $f || -L $f ]]; then existing+=("$f"); else print -u2 "del: ${${DUSK_ZH:+不存在}:-not found}: $f"; missing=1; fi
   done
   files=("${existing[@]}")
   (( $#files )) || return $missing
@@ -56,7 +56,7 @@ _dk_del() {
 
 _dk_empty_trash() {
   local dir=$(_dk_trash_dir)
-  _dk_ask "永久清空回收站 $dir ？" || return 1
+  _dk_ask "${${DUSK_ZH:+永久清空回收站}:-Permanently empty the trash} $dir ?" || return 1
   if [[ $OSTYPE == darwin* ]]; then
     osascript -e 'tell application "Finder" to empty trash' 2>/dev/null || command rm -rf -- $dir/*(DN)
   elif (( $+commands[gio] )) && gio trash --empty 2>/dev/null; then
@@ -85,7 +85,7 @@ _dk_bind gitps 'git push origin HEAD'       # push the current branch
 
 _dk_gitc() {                                    # gitc fix typo   /   gitc  (asks)
   local msg="$*"
-  [[ -n $msg ]] || read -r "msg?提交说明: "
+  [[ -n $msg ]] || read -r "msg?${${DUSK_ZH:+提交说明}:-Commit message}: "
   [[ -n $msg ]] && git commit -m "$msg"
 }
 
@@ -95,7 +95,7 @@ _dk_gitch() {                                   # gitch dev   /   gitch  (pick a
   if (( $+commands[fzf] )); then
     b=$(git branch --all --format='%(refname:short)' | sed 's#^origin/##' | sort -u | fzf --prompt='branch> ') || return
   else
-    git branch; read -r "b?切换到分支: "
+    git branch; read -r "b?${${DUSK_ZH:+切换到分支}:-Switch to branch}: "
   fi
   [[ -n $b ]] && git checkout "$b"
 }
@@ -121,14 +121,14 @@ _dk_pid() {                                     # pid python   /   pid  (GPU pro
   elif (( $+commands[nvidia-smi] )); then
     nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
   else
-    print "用法: pid <进程名关键词>"
+    print "${${DUSK_ZH:+用法: pid <进程名关键词>}:-usage: pid <process name>}"
   fi
 }
 
 _dk_port() {                                    # port 8080
-  [[ -n $1 ]] || { print "用法: port <端口号>"; return 1 }
+  [[ -n $1 ]] || { print "${${DUSK_ZH:+用法: port <端口号>}:-usage: port <port number>}"; return 1 }
   if (( $+commands[lsof] )); then
-    lsof -nP -iTCP:$1 -sTCP:LISTEN 2>/dev/null || print "没有进程在监听 $1"
+    lsof -nP -iTCP:$1 -sTCP:LISTEN 2>/dev/null || print "${${DUSK_ZH:+没有进程在监听}:-nothing is listening on} $1"
   else
     ss -ltnp 2>/dev/null | awk -v p=":$1" 'NR==1 || $4 ~ p"$"'
   fi
@@ -136,22 +136,22 @@ _dk_port() {                                    # port 8080
 
 # ─── PATH and permissions ────────────────────────────────────────────────────
 _dk_pathadd() {                                 # pathadd ~/bin   /   pathadd ~/bin -s  (save to ~/.zshrc)
-  [[ -n $1 ]] || { print "用法: pathadd <目录> [-s]"; return 1 }
+  [[ -n $1 ]] || { print "${${DUSK_ZH:+用法: pathadd <目录> [-s]}:-usage: pathadd <folder> [-s]}"; return 1 }
   local d=${1:A}
-  [[ -d $d ]] || { print "目录不存在: $d"; return 1 }
+  [[ -d $d ]] || { print "${${DUSK_ZH:+目录不存在}:-no such folder}: $d"; return 1 }
   path=($d $path)
   if [[ $2 == -s || $2 == --save ]]; then
     print "export PATH=\"$d:\$PATH\"   # added by pathadd" >> ${ZDOTDIR:-$HOME}/.zshrc
-    print "已加入 PATH 并写入 ~/.zshrc"
+    print "${${DUSK_ZH:+已加入 PATH 并写入 ~/.zshrc}:-added to PATH and saved in ~/.zshrc}"
   else
-    print "已加入当前会话的 PATH（加 -s 永久保存）"
+    print "${${DUSK_ZH:+已加入当前会话的 PATH（加 -s 永久保存）}:-added to PATH for this session (-s to keep it)}"
   fi
 }
 
 _dk_recursive() {                           # _dk_recursive chmod|chown <dir> <value>
   local cmd=$1 dir=$2 val=$3
-  [[ -n $dir && -n $val ]] || { print "用法: my$cmd <目录> <值>"; return 1 }
-  [[ -e $dir ]] || { print "不存在: $dir"; return 1 }
+  [[ -n $dir && -n $val ]] || { print "${${DUSK_ZH:+用法}:-usage}: my$cmd <dir> <value>"; return 1 }
+  [[ -e $dir ]] || { print "${${DUSK_ZH:+不存在}:-not found}: $dir"; return 1 }
   _dk_ask "$cmd -R $val ${dir:A} ？" || return 1
   if [[ -w $dir && $cmd == chmod ]]; then command $cmd -R $val -- $dir
   else sudo $cmd -R $val -- $dir; fi

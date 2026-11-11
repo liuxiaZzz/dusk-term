@@ -153,10 +153,11 @@ APPLESCRIPT
 
 _dusk_ago() {
   local s=$1
-  if   (( s < 60 ));    then REPLY="刚刚"
-  elif (( s < 3600 ));  then REPLY="$(( s / 60 )) 分钟前"
-  elif (( s < 86400 )); then REPLY="$(( s / 3600 )) 小时前"
-  else REPLY="$(( s / 86400 )) 天前"; fi
+  local n
+  if   (( s < 60 ));    then REPLY=${${DUSK_ZH:+刚刚}:-just now}
+  elif (( s < 3600 ));  then n=$(( s / 60 ));    REPLY="$n ${${DUSK_ZH:+分钟前}:-min ago}"
+  elif (( s < 86400 )); then n=$(( s / 3600 ));  REPLY="$n ${${DUSK_ZH:+小时前}:-h ago}"
+  else                       n=$(( s / 86400 )); REPLY="$n ${${DUSK_ZH:+天前}:-d ago}"; fi
 }
 
 _dusk_tmux_pick() {
@@ -175,7 +176,7 @@ _dusk_tmux_pick() {
     alive=0; for p in $pids; do kill -0 $p 2>/dev/null && alive=1; done
     (( alive && i < 100 )) || break                 # all answered, or ~8 s passed
     (( i >= 99 )) && kill $pids 2>/dev/null
-    printf '\r  \e[38;2;228;139;180m%s\e[0m 正在查看 %s 台服务器上的 tmux 会话…' "${frames:$(( i++ % 10 )):1}" $#hosts
+    printf "\r  \e[38;2;228;139;180m%s\e[0m ${${DUSK_ZH:+正在查看 %s 台服务器上的 tmux 会话…}:-checking tmux sessions on %s server(s)…}" "${frames:$(( i++ % 10 )):1}" $#hosts
     sleep 0.08
   done
   printf '\r\e[K'
@@ -185,24 +186,24 @@ _dusk_tmux_pick() {
   for h in $hosts; do
     lines=("${(@f)$(<$tmp/${h//\//_} 2>/dev/null)}")
     if [[ -z $lines[1] || $lines[1] == fail* ]]; then
-      rows+=("$(printf '\e[38;2;127;132;163m%-16s  连不上（需要密码或网络不通），仍可新建\e[0m' $h)"); keys+=("$h|")
+      rows+=("$(printf "\e[38;2;127;132;163m%-16s  ${${DUSK_ZH:+连不上（需要密码或网络不通），仍可新建}:-unreachable (needs a password, or no network); you can still start one}\e[0m" $h)"); keys+=("$h|")
     else
       now=${${(M)lines:#now *}#now }
       for line in ${(M)lines:#s *}; do
         line=${line#s }
         name=${line%%|*}; line=${line#*|}; win=${line%%|*}; line=${line#*|}; att=${line%%|*}; act=${line#*|}
         _dusk_ago $(( ${now:-0} - ${act:-0} ))
-        rows+=("$(printf '\e[38;2;122;162;255m%-16s\e[0m  \e[1m%-14s\e[0m %2s 个窗口  %s  \e[38;2;127;132;163m%s\e[0m' \
-          $h $name $win "$( (( att > 0 )) && print -n '\e[38;2;228;139;180m● 已连接\e[0m' || print -n '○ 未连接')" "$REPLY")")
+        rows+=("$(printf "\e[38;2;122;162;255m%-16s\e[0m  \e[1m%-14s\e[0m %2s ${${DUSK_ZH:+个窗口}:-windows}  %s  \e[38;2;127;132;163m%s\e[0m" \
+          $h $name $win "$( (( att > 0 )) && print -n "\e[38;2;228;139;180m● ${${DUSK_ZH:+已连接}:-attached}\e[0m" || print -n "○ ${${DUSK_ZH:+未连接}:-detached}")" "$REPLY")")
         keys+=("$h|$name")
       done
     fi
-    rows+=("$(printf '\e[38;2;122;162;255m%-16s\e[0m  \e[38;2;228;139;180m＋ 新建会话\e[0m' $h)"); keys+=("$h|+")
+    rows+=("$(printf "\e[38;2;122;162;255m%-16s\e[0m  \e[38;2;228;139;180m＋ ${${DUSK_ZH:+新建会话}:-new session}\e[0m" $h)"); keys+=("$h|+")
   done
   command rm -rf "$tmp"
   _dusk_ssh_config_hosts; local -a others=(${reply:|hosts})
   if (( $#others )); then
-    rows+=("$(printf '\e[38;2;228;139;180m＋ 其他服务器…\e[0m  \e[38;2;127;132;163m~/.ssh/config 里还有 %s 台\e[0m' $#others)"); keys+=("|other")
+    rows+=("$(printf "\e[38;2;228;139;180m＋ ${${DUSK_ZH:+其他服务器…}:-other servers…}\e[0m  \e[38;2;127;132;163m${${DUSK_ZH:+~/.ssh/config 里还有 %s 台}:-%s more in ~/.ssh/config}\e[0m" $#others)"); keys+=("|other")
   fi
 
   local idx
@@ -210,13 +211,13 @@ _dusk_tmux_pick() {
     local n=0 pick
     pick=$(for line in $rows; do (( n++ )); printf '%3d  %s\n' $n "$line"; done | \
       fzf --ansi --height=50% --layout=reverse --border=rounded --prompt='tmux › ' --info=hidden \
-          --header='选一个会话回车进入；Esc 取消' \
+          --header="${${DUSK_ZH:+选一个会话回车进入；Esc 取消}:-pick a session and press Enter; Esc to cancel}" \
           --color='border:#e48bb4,prompt:#7aa2ff,pointer:#e48bb4,hl:#e48bb4,hl+:#e48bb4,header:8') || return 0
     idx=${${=pick}[1]}
   else
     print
     local n=0; for line in $rows; do (( n++ )); printf '  \e[38;2;122;162;255m%2d\e[0m  %s\n' $n "$line"; done
-    read -r "idx?$(print -n '  \e[38;2;228;139;180m❯\e[0m ')输入编号（回车取消）："
+    read -r "idx?$(print -n '  \e[38;2;228;139;180m❯\e[0m ')${${DUSK_ZH:+输入编号（回车取消）：}:-Number (Enter to cancel): }"
   fi
   [[ $idx == <-> ]] && (( idx >= 1 && idx <= $#keys )) || return 0
   h=${keys[idx]%%|*}; name=${keys[idx]#*|}
@@ -225,7 +226,7 @@ _dusk_tmux_pick() {
     h=$REPLY; name=+
   fi
   if [[ -z $name || $name == + ]]; then
-    read -r "name?$(print -n '  \e[38;2;228;139;180m❯\e[0m ')在 $h 上新建的会话名 [${DUSK_TMUX_SESSION}]："
+    read -r "name?$(print -n '  \e[38;2;228;139;180m❯\e[0m ')${${DUSK_ZH:+新会话名}:-New session name} ($h) [$DUSK_TMUX_SESSION]: "
     name=${name:-$DUSK_TMUX_SESSION}
   fi
   _dusk_tmux_open "$h" "$name"
@@ -236,18 +237,18 @@ _dusk_pick_other_host() {
   local -a list=("$@"); local pick idx n=0 h
   if (( $+commands[fzf] )) && [[ -t 0 && -t 1 ]]; then
     pick=$(for h in $list; do (( n++ )); printf '%3d  \e[38;2;122;162;255m%s\e[0m\n' $n $h; done | \
-      fzf --ansi --height=50% --layout=reverse --border=rounded --prompt='服务器 › ' --info=hidden \
-          --header='~/.ssh/config 里的服务器；回车选择，Esc 返回' \
+      fzf --ansi --height=50% --layout=reverse --border=rounded --prompt="${${DUSK_ZH:+服务器}:-server} › " --info=hidden \
+          --header="${${DUSK_ZH:+~/.ssh/config 里的服务器；回车选择，Esc 返回}:-servers from ~/.ssh/config; Enter to pick, Esc to go back}" \
           --color='border:#e48bb4,prompt:#7aa2ff,pointer:#e48bb4,hl:#e48bb4,hl+:#e48bb4,header:8') || return 1
     idx=${${=pick}[1]}
   else
     print; for h in $list; do (( n++ )); printf '  \e[38;2;122;162;255m%2d\e[0m  %s\n' $n $h; done
-    read -r "idx?$(print -n '  \e[38;2;228;139;180m❯\e[0m ')选服务器编号（回车取消）："
+    read -r "idx?$(print -n '  \e[38;2;228;139;180m❯\e[0m ')${${DUSK_ZH:+选服务器编号（回车取消）：}:-Server number (Enter to cancel): }"
   fi
   [[ $idx == <-> ]] && (( idx >= 1 && idx <= $#list )) || return 1
   h=$list[idx]
   local yn
-  read -r "yn?$(print -n '  \e[38;2;228;139;180m❯\e[0m ')把 $h 加入 $DUSK_TMUX_CMD 的常用列表，以后每次都显示它的会话？[Y/n] "
+  read -r "yn?$(print -n '  \e[38;2;228;139;180m❯\e[0m ')${${DUSK_ZH:+加入常用列表，以后每次都显示它的会话？}:-Add it to your list so its sessions show up every time?} ($h) [Y/n] "
   if [[ $yn != [nN]* ]] && (( $+functions[_dk_config_set] )); then
     _dusk_tmux_hosts; local -a merged=(${(u)reply} $h)
     _dk_config_set DUSK_TMUX_HOSTS "${merged[*]}"
@@ -258,7 +259,7 @@ _dusk_pick_other_host() {
 
 _dusk_tmux() {
   _dusk_tmux_hosts; local -a hosts=($reply)
-  (( $#hosts )) || { print "还没设置服务器：运行 dusk tmux"; return 1 }
+  (( $#hosts )) || { print "${${DUSK_ZH:+还没设置服务器：运行 dusk tmux}:-no servers yet: run dusk tmux}"; return 1 }
   if (( $# == 0 )); then _dusk_tmux_pick; return; fi
   _dusk_ssh_config_hosts; local -a known=($reply)
   if (( $# >= 2 )) || (( ${hosts[(Ie)$1]} || ${known[(Ie)$1]} )); then _dusk_tmux_open "$1" "${2:-$DUSK_TMUX_SESSION}"

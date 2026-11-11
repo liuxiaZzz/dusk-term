@@ -20,9 +20,13 @@ typeset -gA _CC_ICON=(
   gpu '󰢮' up '󰅐' dir '' git '' py ''
   net '󰖩' host '󰒋' ssh '󰌘'
 )
-typeset -ga _CC_QUOTES=(
+typeset -ga _CC_QUOTES_ZH=(
   "保持冷静，保持锋利。" "先锁定目标，再击穿问题。" "终端已就绪，思路开始加速。"
   "今天的主线任务交给你了。" "少一点噪音，多一点执行。" "一次只做一件事。"
+)
+typeset -ga _CC_QUOTES_EN=(
+  "Stay calm, stay sharp." "Pick the target, then break the problem." "Terminal ready. Let's go."
+  "Today's main quest is yours." "Less noise, more doing." "One thing at a time."
 )
 
 # visible width of a prompt-escaped string (%F{..} %K{..} %f %k %B %b removed).
@@ -91,8 +95,8 @@ _cc_collect() {
     line=$(/usr/bin/pmset -g batt 2>/dev/null)
     if [[ $line == *InternalBattery* ]]; then
       CC[bat]=${${line##*InternalBattery*$'\t'}%%\%*}
-      if [[ $line == *"; charging;"* ]]; then CC[chg]=充电中
-      elif [[ $line == *"AC attached"* ]]; then CC[chg]=已接电源; fi
+      if [[ $line == *"; charging;"* ]]; then CC[chg]=${${DUSK_ZH:+充电中}:-charging}
+      elif [[ $line == *"AC attached"* ]]; then CC[chg]=${${DUSK_ZH:+已接电源}:-plugged in}; fi
       [[ $line == *[0-9]:[0-9][0-9]\ remaining* ]] && CC[left]=${${line%% remaining*}##* }
     fi
     CC[ip]=$(/usr/sbin/ipconfig getifaddr en0 2>/dev/null || /usr/sbin/ipconfig getifaddr en1 2>/dev/null)
@@ -109,7 +113,7 @@ _cc_collect() {
     CC[disk]=${${(s: :)${(f)"$(df -P / 2>/dev/null)"}[-1]}[5]%\%}
     local b; for b in /sys/class/power_supply/BAT*(N[1]); do
       CC[bat]=$(<$b/capacity)
-      case $(<$b/status) in Charging) CC[chg]=充电中 ;; Full|"Not charging") CC[chg]=已接电源 ;; esac
+      case $(<$b/status) in Charging) CC[chg]=${${DUSK_ZH:+充电中}:-charging} ;; Full|"Not charging") CC[chg]=${${DUSK_ZH:+已接电源}:-plugged in} ;; esac
     done
     if (( $+commands[nvidia-smi] )); then
       local g=$(nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null | head -1)
@@ -131,18 +135,21 @@ _cc_collect() {
 
 _cc_uptime() {
   local s=$1
-  if   (( s >= 86400 )); then REPLY="$(( s / 86400 ))天 $(( s % 86400 / 3600 ))小时"
-  elif (( s >= 3600  )); then REPLY="$(( s / 3600 ))小时 $(( s % 3600 / 60 ))分"
-  else REPLY="$(( s / 60 ))分钟"; fi
+  local d=$(( s / 86400 )) h=$(( s % 86400 / 3600 )) m=$(( s % 3600 / 60 ))
+  if [[ -n $DUSK_ZH ]]; then
+    if (( d )); then REPLY="${d}天 ${h}小时"; elif (( h )); then REPLY="${h}小时 ${m}分"; else REPLY="${m}分钟"; fi
+  else
+    if (( d )); then REPLY="${d}d ${h}h"; elif (( h )); then REPLY="${h}h ${m}m"; else REPLY="${m} min"; fi
+  fi
 }
 
 # ─── render ──────────────────────────────────────────────────────────────────
 _cc_greeting() {
   local h=${(%):-%D{%H}}
-  if   (( 10#$h < 6  )); then REPLY="夜深了"
-  elif (( 10#$h < 12 )); then REPLY="早上好"
-  elif (( 10#$h < 18 )); then REPLY="下午好"
-  else                         REPLY="晚上好"; fi
+  if   (( 10#$h < 6  )); then REPLY=${${DUSK_ZH:+夜深了}:-Up late}
+  elif (( 10#$h < 12 )); then REPLY=${${DUSK_ZH:+早上好}:-Good morning}
+  elif (( 10#$h < 18 )); then REPLY=${${DUSK_ZH:+下午好}:-Good afternoon}
+  else                         REPLY=${${DUSK_ZH:+晚上好}:-Good evening}; fi
 }
 
 _cc_compact() {
@@ -170,11 +177,15 @@ _cc_full() {
     clock[1]+="${g[1]} "; clock[2]+="${g[2]} "; clock[3]+="${g[3]} "
   done
   local -a wd=(星期一 星期二 星期三 星期四 星期五 星期六 星期日)
+  local -a wde=(Mon Tue Wed Thu Fri Sat Sun) mon=(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec)
   local Y M D U
   strftime -s Y %Y $EPOCHSECONDS; strftime -s M %m $EPOCHSECONDS
   strftime -s D %d $EPOCHSECONDS; strftime -s U %u $EPOCHSECONDS
-  local date="${Y}年$(( 10#$M ))月$(( 10#$D ))日  ${wd[U]}"
-  local quote=${_CC_QUOTES[RANDOM % $#_CC_QUOTES + 1]}
+  local date
+  if [[ -n $DUSK_ZH ]]; then date="${Y}年$(( 10#$M ))月$(( 10#$D ))日  ${wd[U]}"
+  else date="${wde[U]}, ${mon[10#$M]} $(( 10#$D )) $Y"; fi
+  local -a qs; if [[ -n $DUSK_ZH ]]; then qs=($_CC_QUOTES_ZH); else qs=($_CC_QUOTES_EN); fi
+  local quote=${qs[RANDOM % $#qs + 1]}
   local -a right=("%B$date%b" "%F{5}✻ $greet%f" "%F{8}$quote%f")
   local -a cl=("")
   for i in 1 2 3; do cl+=("  %B%F{${_CC_ROWCOLOR[i]}}${clock[i]}%f%b   ${right[i]}"); done
@@ -189,18 +200,19 @@ _cc_full() {
     local bar=""; [[ -n $5 ]] && { _cc_bar $5 $bw; bar=$REPLY; }
     _cc_card $tw "%F{4}$1 $2%f" "$v" "$bar"
   }
-  _cc_tile $_CC_ICON[cpu]  CPU  "${CC[cpu]:---}%%" "负载" ${CC[cpu]:-0};          local -a t1=("${reply[@]}")
-  _cc_tile $_CC_ICON[mem]  内存 "${CC[mem]:---}%%" "${CC[memtot]}" ${CC[mem]:-0}; local -a t2=("${reply[@]}")
-  _cc_tile $_CC_ICON[disk] 磁盘 "${CC[disk]:---}%%" "已用" ${CC[disk]:-0};       local -a t3=("${reply[@]}")
+  _cc_tile $_CC_ICON[cpu]  CPU  "${CC[cpu]:---}%%" "${${DUSK_ZH:+负载}:-load}" ${CC[cpu]:-0};          local -a t1=("${reply[@]}")
+  _cc_tile $_CC_ICON[mem]  ${${DUSK_ZH:+内存}:-Memory} "${CC[mem]:---}%%" "${CC[memtot]}" ${CC[mem]:-0}; local -a t2=("${reply[@]}")
+  _cc_tile $_CC_ICON[disk] ${${DUSK_ZH:+磁盘}:-Disk} "${CC[disk]:---}%%" "${${DUSK_ZH:+已用}:-used}" ${CC[disk]:-0};       local -a t3=("${reply[@]}")
   if [[ -n ${CC[gpu]} ]]; then
     _cc_tile $_CC_ICON[gpu] GPU "${CC[gpu]}%%" "${CC[gpumem]}" ${CC[gpu]}
   elif [[ -n ${CC[bat]} ]]; then
-    local extra=${CC[chg]:-${CC[left]:+剩 ${CC[left]}}}
-    _cc_tile ${${CC[chg]:+$_CC_ICON[chg]}:-$_CC_ICON[bat]} 电池 "${CC[bat]}%%" "$extra" ${CC[bat]}
+    local left_word=${${DUSK_ZH:+剩}:-left}
+    local extra=${CC[chg]:-${CC[left]:+${CC[left]} $left_word}}
+    _cc_tile ${${CC[chg]:+$_CC_ICON[chg]}:-$_CC_ICON[bat]} ${${DUSK_ZH:+电池}:-Battery} "${CC[bat]}%%" "$extra" ${CC[bat]}
     # battery bar: pink when fine, rose when low
     (( CC[bat] <= 20 )) && reply=("${(@)reply//\%F\{5\}━/%F{1}━}")
   else
-    _cc_uptime ${CC[up]:-0}; _cc_tile $_CC_ICON[up] 运行 "$REPLY" "" ""
+    _cc_uptime ${CC[up]:-0}; _cc_tile $_CC_ICON[up] ${${DUSK_ZH:+运行}:-Uptime} "$REPLY" "" ""
   fi
   local -a t4=("${reply[@]}")
   local -a row
@@ -219,32 +231,33 @@ _cc_full() {
   local -a ws=("%F{4}$_CC_ICON[dir]%f $REPLY")
   if [[ -n ${CC[branch]} ]]; then
     _cc_esc ${CC[branch]}; x="%F{5}$_CC_ICON[git]%f $REPLY"
-    [[ ${CC[dirty]:-0} != 0 ]] && x+="  %F{8}${CC[dirty]} 处改动%f"
+    [[ ${CC[dirty]:-0} != 0 ]] && x+="  %F{8}${CC[dirty]} ${${DUSK_ZH:+处改动}:-changed}%f"
     ws+=("$x")
-  else ws+=("%F{8}$_CC_ICON[git] 不在 git 仓库%f"); fi
+  else ws+=("%F{8}$_CC_ICON[git] ${${DUSK_ZH:+不在 git 仓库}:-not a git repo}%f"); fi
   if [[ -n ${CC[env]} ]]; then ws+=("%F{4}$_CC_ICON[py]%f ${CC[env]}")
-  else ws+=("%F{8}$_CC_ICON[py] 无 Python 环境%f"); fi
+  else ws+=("%F{8}$_CC_ICON[py] ${${DUSK_ZH:+无 Python 环境}:-no Python env}%f"); fi
   _cc_uptime ${CC[up]:-0}; local up=$REPLY
   _cc_fit "${(%):-%m}" $cw; _cc_esc "$REPLY"
   local -a sy=("%F{4}$_CC_ICON[host]%f $REPLY")
-  x="%F{5}$_CC_ICON[net]%f ${CC[ip]:-离线}"
-  [[ -n ${CC[from]} ]] && x+="  %F{8}$_CC_ICON[ssh] 来自 ${CC[from]}%f"
-  sy+=("$x" "%F{4}$_CC_ICON[up]%f 已运行 $up  %F{8}${CC[os]}%f")
+  local offline=${${DUSK_ZH:+离线}:-offline}
+  x="%F{5}$_CC_ICON[net]%f ${CC[ip]:-$offline}"
+  [[ -n ${CC[from]} ]] && x+="  %F{8}$_CC_ICON[ssh] ${${DUSK_ZH:+来自}:-from} ${CC[from]}%f"
+  sy+=("$x" "%F{4}$_CC_ICON[up]%f ${${DUSK_ZH:+已运行}:-up} $up  %F{8}${CC[os]}%f")
   if (( per == 4 )); then
-    _cc_card $hw "%F{4}工作区%f" "${ws[@]}"; local -a c1=("${reply[@]}")
-    _cc_card $hw2 "%F{4}系统%f" "${sy[@]}"; local -a c2=("${reply[@]}")
+    _cc_card $hw "%F{4}${${DUSK_ZH:+工作区}:-Workspace}%f" "${ws[@]}"; local -a c1=("${reply[@]}")
+    _cc_card $hw2 "%F{4}${${DUSK_ZH:+系统}:-System}%f" "${sy[@]}"; local -a c2=("${reply[@]}")
     for i in {1..$#c1}; do lines+=("${c1[i]} ${c2[i]}"); done
   else
-    _cc_card $W "%F{4}工作区%f" "${ws[@]}"; lines+=("${reply[@]}")
-    _cc_card $W "%F{4}系统%f" "${sy[@]}"; lines+=("${reply[@]}")
+    _cc_card $W "%F{4}${${DUSK_ZH:+工作区}:-Workspace}%f" "${ws[@]}"; lines+=("${reply[@]}")
+    _cc_card $W "%F{4}${${DUSK_ZH:+系统}:-System}%f" "${sy[@]}"; lines+=("${reply[@]}")
   fi
 
   # 4. quick actions, like Control Center buttons
   local -a pills=()
-  (( $+functions[j] || $+aliases[j] )) && pills+=("j 跳转")
-  pills+=("⌃R 历史" "⌃T 找文件")
-  (( $+aliases[x] )) && pills+=("x 解压")
-  (( $+functions[dusk] )) && pills+=("dusk 全部功能")
+  (( $+functions[j] || $+aliases[j] )) && pills+=("j ${${DUSK_ZH:+跳转}:-jump}")
+  pills+=("⌃R ${${DUSK_ZH:+历史}:-history}" "⌃T ${${DUSK_ZH:+找文件}:-files}")
+  (( $+aliases[x] )) && pills+=("x ${${DUSK_ZH:+解压}:-extract}")
+  (( $+functions[dusk] )) && pills+=("dusk ${${DUSK_ZH:+全部功能}:-everything}")
   local p bar="" k=0
   for p in $pills; do
     (( k++ % 2 )) && bar+="%K{5}%F{0} $p %f%k " || bar+="%K{4}%F{0} $p %f%k "
