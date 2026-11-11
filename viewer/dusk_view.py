@@ -476,7 +476,7 @@ input{background:#ffffff12;border:1px solid var(--line);color:var(--fg);border-r
 input:focus{border-color:var(--pink)}
 main{padding:68px 18px 24px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:transform .12s,border-color .12s}
+.card{display:block;color:inherit;text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:transform .12s,border-color .12s}
 .card:hover{transform:translateY(-2px);border-color:var(--pink)}
 .thumb{height:150px;display:flex;align-items:center;justify-content:center;background:#0b1226}
 .thumb img{max-width:100%;max-height:100%;object-fit:contain}
@@ -515,31 +515,37 @@ const join = (a, b) => a ? a + "/" + b : b;
 
 function crumbs(path, file) {
   const parts = path ? path.split("/") : [];
-  let html = `<a onclick="openDir('')">根目录</a>`, acc = "";
-  for (const p of parts) { acc = join(acc, p); const a = acc; html += `<span>/</span><a onclick='openDir(${JSON.stringify(a)})'>${esc(p)}</a>`; }
+  let html = `<a href="#">根目录</a>`, acc = "";
+  for (const p of parts) { acc = join(acc, p); html += `<span>/</span><a href="#${enc(acc)}">${esc(p)}</a>`; }
   if (file) html += `<span>/</span><span style="color:var(--fg)">${esc(file)}</span>`;
   $("crumbs").innerHTML = html;
 }
 function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
-async function openDir(path, push = true) {
-  const r = await fetch("/api/list?p=" + enc(path)); const d = await r.json();
-  if (d.error) { $("grid").innerHTML = `<div class="empty err">${esc(d.error)}</div>`; return; }
-  dir = d.path; entries = d.entries; images = entries.filter(e => e.type !== "dir");
+// The URL hash is the place (folder or image): links, ⌘-click into new tabs, back/forward and
+// refresh all go through route().
+let listed = null;
+async function route() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  const r = await fetch("/api/list?p=" + enc(h || START || "")); const d = await r.json();
+  if (d.error) { showBrowser(); $("grid").innerHTML = `<div class="empty err">${esc(d.error)}</div>`; return; }
+  if (listed !== d.path) { dir = d.path; entries = d.entries; images = entries.filter(e => e.type !== "dir"); listed = d.path; $("filter").value = ""; }
+  if (d.open) { showImage(d.open); return; }
   showBrowser(); crumbs(dir); render();
-  if (d.open) { openImage(d.open); return; }
-  if (push) location.hash = "#" + enc(dir);
 }
+function openDir(path) { location.hash = "#" + enc(path); }
+function openImage(name) { location.hash = "#" + enc(join(dir, name)); }
+window.addEventListener("hashchange", route);
 function render() {
   const f = $("filter").value.toLowerCase();
   const list = entries.filter(e => !f || e.name.toLowerCase().includes(f));
   if (!list.length) { $("grid").innerHTML = `<div class="empty">这里没有图片或子文件夹</div>`; return; }
   $("grid").innerHTML = list.map(e => {
     const p = join(dir, e.name);
-    if (e.type === "dir") return `<div class="card" onclick='openDir(${JSON.stringify(p)})'><div class="thumb"><span class="icon">📁</span></div>
-      <div class="meta"><div class="name">${esc(e.name)}</div><div class="sub">文件夹</div></div></div>`;
-    return `<div class="card" onclick='openImage(${JSON.stringify(e.name)})'><div class="thumb"><img loading="lazy" src="/api/thumb?p=${enc(p)}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'icon',textContent:'🖼'}))"></div>
-      <div class="meta"><div class="name">${esc(e.name)}</div><div class="sub">${e.type === "slide" ? "切片 · " : ""}${fmt(e.size)}</div></div></div>`;
+    if (e.type === "dir") return `<a class="card" href="#${enc(p)}"><div class="thumb"><span class="icon">📁</span></div>
+      <div class="meta"><div class="name">${esc(e.name)}</div><div class="sub">文件夹</div></div></a>`;
+    return `<a class="card" href="#${enc(p)}" title="⌘+点击：在新标签页打开"><div class="thumb"><img loading="lazy" src="/api/thumb?p=${enc(p)}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'icon',textContent:'🖼'}))"></div>
+      <div class="meta"><div class="name">${esc(e.name)}</div><div class="sub">${e.type === "slide" ? "切片 · " : ""}${fmt(e.size)}</div></div></a>`;
   }).join("");
 }
 $("filter").addEventListener("input", render);
@@ -548,12 +554,11 @@ function showBrowser() {
   $("browser").style.display = ""; $("viewer").style.display = "none";
   $("hud").style.display = "none"; $("btns").style.display = "none"; $("filter").style.display = ""; current = null;
 }
-async function openImage(name) {
+async function showImage(name) {
   const p = join(dir, name); current = name;
   $("browser").style.display = "none"; $("viewer").style.display = "block"; $("filter").style.display = "none";
   $("hud").style.display = "flex"; $("btns").style.display = "flex"; crumbs(dir, name);
   $("title").innerHTML = `<b>${esc(name)}</b>`; $("dims").textContent = "载入中…"; $("zoom").textContent = ""; $("scale").style.display = "none";
-  location.hash = "#" + enc(p);
   const r = await fetch("/api/info?p=" + enc(p)); const info = await r.json();
   if (info.error) { $("dims").innerHTML = `<span class="err">${esc(info.error)}</span>`; if (osd) osd.close(); return; }
   const pr = info.props || {};
@@ -599,11 +604,7 @@ document.addEventListener("keydown", e => {
     else if (e.key === "0") osd.viewport.goHome(); else if (e.key === "f") toggleFull();
   } else if (e.key === "/") { e.preventDefault(); $("filter").focus(); }
 });
-window.addEventListener("hashchange", () => {});
-(async () => {
-  const h = decodeURIComponent(location.hash.slice(1));
-  await openDir(h || START || "", false);
-})();
+route();
 </script></body></html>"""
 
 
